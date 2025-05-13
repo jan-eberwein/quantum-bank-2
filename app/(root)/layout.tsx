@@ -1,15 +1,15 @@
-"use client";
+'use client';
 
 import Sidebar from "@/components/Sidebar";
 import { CopilotPopup } from "@copilotkit/react-ui";
 import { CopilotKit } from "@copilotkit/react-core";
 import "@copilotkit/react-ui/styles.css";
 import CopilotChartHandler from "@/components/CopilotChartHandler";
-import { motion, AnimatePresence } from "framer-motion";
-import { usePathname } from "next/navigation";
+import { motion } from "framer-motion";
+import useUser from "@/hooks/useUser";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const loggedIn = { firstName: "Jan", lastName: "Eberwein" };
+  const { user } = useUser();
 
   const animationVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -20,7 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <CopilotKit runtimeUrl="/api/copilotkit">
       <main className="flex h-screen w-full font-inter">
-        <Sidebar user={loggedIn} />
+        <Sidebar user={user} />
         <motion.div
           className="flex w-full"
           variants={animationVariants}

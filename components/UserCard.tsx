@@ -1,6 +1,7 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
+import LogoutButton from './LogoutButton';
 
 const UserCard = () => {
   return (
@@ -22,7 +23,7 @@ const UserCard = () => {
         </p>
         <p className="text-sm text-gray-500">1234 5678 9012</p>
       </div>
-
+      <LogoutButton />
       {/*
       {/* Logout Button - Hidden on screens below 1024px */}
       {/*

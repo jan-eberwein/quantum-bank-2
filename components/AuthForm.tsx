@@ -1,137 +1,97 @@
-'use client';
+"use client";
 
-import Image from 'next/image';
-import Link from 'next/link';
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation'; // Updated import
+import React, { useState } from "react";
+import { account } from "@/lib/appwrite"; // Import Appwrite account object
+import { useRouter } from "next/navigation"; // Import from next/navigation instead of next/router
+import { Input } from "@/components/ui/input"; // Using your custom Input component
+import { Button } from "@/components/ui/button"; // Using your custom Button component
+import { Label } from "@/components/ui/label"; // Using your custom Label component
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+interface AuthFormProps {
+  type: "sign-in" | "sign-up";
+}
 
-// Mock User Data (vorher definieren)
-const MOCK_USERS = [
-  { email: 'jan@quantum.com', password: 'password', name: 'Jan Eberwein' },
-  { email: 'johannes@quantum.com', password: 'password', name: 'Johannes Eder' },
-  { email: 'johnny@quantum.com', password: 'password', name: 'Johnny Eder' },
-];
+const AuthForm: React.FC<AuthFormProps> = ({ type }) => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [userId, setUserId] = useState(""); // Manage userId here
+  const [error, setError] = useState<string | null>(null);
 
-const AuthForm = ({ type }: { type: string }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const router = useRouter(); // Initialize the router
+  const router = useRouter(); // Call useRouter directly here
 
-  const validateEmail = (email: string) => {
-    return email.includes('@') && email.includes('.');
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
 
-    if (type === 'sign-up') {
-      if (!email) {
-        setError('Email ist erforderlich');
-        return;
+    try {
+      // Sanitize userId
+      const sanitizedUserId = userId
+        .trim() // Trim any leading/trailing whitespace
+        .replace(/[^a-zA-Z0-9.-_]/g, "") // Remove invalid characters
+        .slice(0, 36); // Limit to 36 characters
+
+      // Validate userId
+      if (!sanitizedUserId || /^[^a-zA-Z0-9]/.test(sanitizedUserId)) {
+        throw new Error("Invalid userId: Must contain only alphanumeric characters, periods, hyphens, and underscores, and can't start with a special character.");
       }
 
-      if (!validateEmail(email)) {
-        setError('Ungültige Email-Adresse');
-        return;
-      }
-
-      if (password.length < 6) {
-        setError('Passwort muss mindestens 6 Zeichen haben');
-        return;
-      }
-
-      alert('Registrierung erfolgreich!');
-    } else if (type === 'sign-in') {
-      const userMatch = MOCK_USERS.find(
-        (user) => user.email === email && user.password === password
-      );
-
-      if (userMatch) {
-        router.push('/'); // Redirect to root page
+      // Create account
+      if (type === "sign-up") {
+        await account.create(sanitizedUserId, email, password, userId);
+        router.push("/"); // Redirect to dashboard after successful registration
       } else {
-        setError('Login fehlgeschlagen.');
+        // Sign in the user
+        await account.createSession(email, password);
+        router.push("/"); // Redirect to dashboard after successful login
       }
+    } catch (err: any) {
+      setError(err.message); // Display error message
     }
   };
 
   return (
-    <section className="auth-form">
-      <header className="flex flex-col gap-5 md:gap-8">
-        <Link href="/" className="cursor-pointer flex items-center gap-1">
-          <Image
-            src="/icons/QuantumLogo.png"
-            width={400}
-            height={280}
-            alt="Quantum logo"
-          />
-        </Link>
-
-        <div className="flex flex-col gap-1 md:gap-3">
-          <h1 className="text-24 lg:text-36 font-semibold text-gray-900">
-            {type === 'sign-in' ? 'Sign In' : 'Sign Up'}
-          </h1>
-        </div>
-      </header>
-
-      <form onSubmit={handleSubmit} className="space-y-8">
-        <div className="space-y-2">
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Email
-          </label>
+    <div className="auth-form">
+      <h1 className="text-24 font-semibold">{type === "sign-in" ? "Sign In" : "Sign Up"}</h1>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+        <div className="form-item">
+          <Label>Email</Label>
           <Input
-            id="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="Enter your email"
+            required
+            className="input-class"
           />
         </div>
 
-        <div className="space-y-2">
-          <label
-            htmlFor="password"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Password
-          </label>
+        <div className="form-item">
+          <Label>Password</Label>
           <Input
-            id="password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Enter your password"
+            required
+            className="input-class"
           />
         </div>
 
-        {error && <p className="text-red-500">{error}</p>}
+        {type === "sign-up" && (
+          <div className="form-item">
+            <Label>Username (userId)</Label>
+            <Input
+              type="text"
+              value={userId}
+              onChange={(e) => setUserId(e.target.value)}
+              required
+              className="input-class"
+            />
+          </div>
+        )}
 
-        <Button type="submit" className="w-full">
-          {type === 'sign-in' ? 'Sign In' : 'Sign Up'}
-        </Button>
+        {error && <p className="form-message">{error}</p>}
+
+        <Button type="submit" className="form-btn">{type === "sign-in" ? "Log In" : "Register"}</Button>
       </form>
-
-      <footer className="flex justify-center gap-1 mt-4">
-        <p className="text-14 font-normal text-gray-600">
-          {type === 'sign-in'
-            ? "Don't have an account?"
-            : 'Already have an account?'}
-        </p>
-        <Link
-          href={type === 'sign-in' ? '/sign-up' : '/sign-in'}
-          className="form-link"
-        >
-          {type === 'sign-in' ? 'Sign up' : 'Sign in'}
-        </Link>
-      </footer>
-    </section>
+    </div>
   );
 };
 

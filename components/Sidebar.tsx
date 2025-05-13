@@ -11,6 +11,7 @@ import { TestShadcnChartCard } from "@/components/TestShadcnChartCard";
 import React from "react";
 import CopilotChartHandler from "./CopilotChartHandler";
 import { format } from "date-fns";
+import LogoutButton from './LogoutButton';
 
 const Sidebar = ({ user }: SidebarProps) => {
   const pathname = usePathname();
@@ -71,7 +72,6 @@ const Sidebar = ({ user }: SidebarProps) => {
               layout="responsive"
               width={16}
               height={9}
-              objectFit="contain"
               alt="Quantum small logo"
               className="sidebar-logo-tablet"
             />
@@ -82,7 +82,6 @@ const Sidebar = ({ user }: SidebarProps) => {
               layout="responsive"
               width={16}
               height={9}
-              objectFit="contain"
               alt="Quantum logo"
               className="sidebar-logo"
             />

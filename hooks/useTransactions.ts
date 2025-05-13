@@ -1,39 +1,45 @@
-import { useEffect, useState } from "react";
-import apiService from "@/lib/apiService"; // Centralized API service
-import { mapTransactionApiToTransaction } from "@/lib/utils";
+import { useEffect, useState } from 'react';
+import { database } from '@/lib/appwrite';
+import { Query } from 'appwrite';
 
-const useTransactions = (accountId: number) => {
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
-    const [loading, setLoading] = useState<boolean>(true);
-    const [error, setError] = useState<string | null>(null);
+const useTransactions = (userId: string | undefined) => {
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        const fetchTransactions = async () => {
-            setLoading(true);
-            setError(null);
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      if (!userId) return;
+      setLoading(true);
+      try {
+        const res = await database.listDocuments(
+          process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+          process.env.NEXT_PUBLIC_APPWRITE_TRANSACTIONS_COLLECTION_ID!,
+          [Query.equal('userId', userId)]
+        );
 
-            try {
-                const apiTransactions = await apiService.get<TransactionApi[]>(
-                    `/transactions/involved/${accountId}`
-                );
+        const mapped = res.documents.map((doc) => ({
+          $id: doc.$id,
+          name: doc.name,
+          accountId: doc.accountId,
+          amount: doc.amount,
+          pending: doc.pending,
+          category: doc.category,
+          date: doc.date,
+          $createdAt: doc.$createdAt
+        }));
+        setTransactions(mapped);
+      } catch (err: any) {
+        setError(err.message || 'Failed to fetch transactions');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-                // Map API transactions to the local format
-                const mappedTransactions: Transaction[] = apiTransactions.map((transaction) =>
-                    mapTransactionApiToTransaction(transaction, accountId)
-                );
+    fetchTransactions();
+  }, [userId]);
 
-                setTransactions(mappedTransactions);
-            } catch (err: any) {
-                setError(err?.message || "An unexpected error occurred");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        if (accountId) fetchTransactions();
-    }, [accountId]);
-
-    return { transactions, loading, error };
+  return { transactions, loading, error };
 };
 
 export default useTransactions;

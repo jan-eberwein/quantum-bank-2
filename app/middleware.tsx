@@ -1,16 +1,21 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export function middleware(req: NextRequest) {
-  const token = req.cookies.get("token")?.value;
+export const config = {
+  matcher: ["/dashboard/:path*", "/transactions/:path*", "/settings/:path*"],
+};
 
-  if (!token && req.nextUrl.pathname !== "/login" && req.nextUrl.pathname !== "/register") {
-    return NextResponse.redirect(new URL("/login", req.url));
+export async function middleware(req: NextRequest) {
+  const publicPaths = ["/sign-in", "/sign-up"];
+  if (publicPaths.includes(req.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
+
+  const session = req.cookies.get("a_session_" + process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID);
+
+  if (!session) {
+    return NextResponse.redirect(new URL("/sign-in", req.url));
   }
 
   return NextResponse.next();
 }
-
-export const config = {
-  matcher: ["/dashboard/:path*", "/transactions/:path*", "/settings/:path*"],
-};
