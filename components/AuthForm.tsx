@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { account } from "@/lib/appwrite";
+import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { account } from "@/lib/appwrite";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -14,7 +16,7 @@ interface AuthFormProps {
 const AuthForm: React.FC<AuthFormProps> = ({ type }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [userId, setUserId] = useState(""); // Only used for sign-up
+  const [userId, setUserId] = useState(""); // Used for sign-up only
   const [error, setError] = useState<string | null>(null);
 
   const router = useRouter();
@@ -49,51 +51,84 @@ const AuthForm: React.FC<AuthFormProps> = ({ type }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="auth-form space-y-4">
-      <div className="form-item">
-        <Label htmlFor="email">Email</Label>
-        <Input
-          type="email"
-          id="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Enter your email"
-          required
-        />
-      </div>
+    <section className="auth-form">
+      <header className="flex flex-col gap-5 md:gap-8 items-center">
+        <Link href="/" className="cursor-pointer flex items-center gap-1">
+          <Image
+            src="/icons/QuantumLogo.png"
+            width={400}
+            height={280}
+            alt="Quantum logo"
+          />
+        </Link>
 
-      <div className="form-item">
-        <Label htmlFor="password">Password</Label>
-        <Input
-          type="password"
-          id="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Enter your password"
-          required
-        />
-      </div>
+        <div className="flex flex-col gap-1 md:gap-3 text-center">
+          <h1 className="text-24 lg:text-36 font-semibold text-gray-900">
+            {type === "sign-in" ? "Sign In" : "Sign Up"}
+          </h1>
+        </div>
+      </header>
 
-      {type === "sign-up" && (
+      <form onSubmit={handleSubmit} className="space-y-6 w-full">
         <div className="form-item">
-          <Label htmlFor="userId">User ID (for internal use)</Label>
+          <Label htmlFor="email">Email</Label>
           <Input
-            type="text"
-            id="userId"
-            value={userId}
-            onChange={(e) => setUserId(e.target.value)}
-            placeholder="e.g., jan-eberwein"
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Enter your email"
             required
           />
         </div>
-      )}
 
-      {error && <p className="form-message">{error}</p>}
+        <div className="form-item">
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter your password"
+            required
+          />
+        </div>
 
-      <Button type="submit" className="form-btn w-full">
-        {type === "sign-up" ? "Sign Up" : "Sign In"}
-      </Button>
-    </form>
+        {type === "sign-up" && (
+          <div className="form-item">
+            <Label htmlFor="userId">User ID (for internal use)</Label>
+            <Input
+              type="text"
+              id="userId"
+              value={userId}
+              onChange={(e) => setUserId(e.target.value)}
+              placeholder="e.g., jan-eberwein"
+              required
+            />
+          </div>
+        )}
+
+        {error && <p className="form-message">{error}</p>}
+
+        <Button type="submit" className="form-btn w-full">
+          {type === "sign-in" ? "Sign In" : "Sign Up"}
+        </Button>
+      </form>
+
+      <footer className="flex justify-center gap-1 mt-4">
+        <p className="text-14 font-normal text-gray-600">
+          {type === "sign-in"
+            ? "Don't have an account?"
+            : "Already have an account?"}
+        </p>
+        <Link
+          href={type === "sign-in" ? "/sign-up" : "/sign-in"}
+          className="form-link"
+        >
+          {type === "sign-in" ? "Sign up" : "Sign in"}
+        </Link>
+      </footer>
+    </section>
   );
 };
 
