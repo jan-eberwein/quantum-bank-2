@@ -7,6 +7,8 @@ import { mockCategoriesData } from "@/constants/index";
 import { useUser } from "@/context/UserContext";
 import dynamic from "next/dynamic";
 import {formatEuroCents} from "@/lib/format";
+import { useCustomVoiceActions } from "@/lib/copilot-actions";
+
 
 const Home = () => {
   const { user, loading } = useUser();
