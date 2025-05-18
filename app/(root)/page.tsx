@@ -5,6 +5,8 @@ import HeaderBox from "@/components/HeaderBox";
 import TotalBalanceBox from "@/components/TotalBalanceBox";
 import LastTransactionsWidget from "@/components/LastTransactionsWidget";
 import { mockCategoriesData } from "@/constants/index";
+import { useCustomVoiceActions } from "@/lib/copilot-actions";
+
 
 const Home = () => {
   const loggedIn = { firstName: "Jan", lastName: "Eberwein" };

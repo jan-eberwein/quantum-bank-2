@@ -12,6 +12,7 @@ import React from "react";
 import CopilotChartHandler from "./CopilotChartHandler";
 import { format } from "date-fns";
 import LogoutButton from './LogoutButton';
+import CopilotUI from "./CopilotUI";
 
 const Sidebar = ({ user }: SidebarProps) => {
   const pathname = usePathname();
@@ -123,7 +124,10 @@ const Sidebar = ({ user }: SidebarProps) => {
           );
         })}
       </nav>
-      <CopilotChartHandler />
+      
+      <CopilotUI/>
+
+
       <UserCard />
     </section>
   );
