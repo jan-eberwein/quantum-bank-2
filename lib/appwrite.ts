@@ -1,4 +1,4 @@
-import { Client, Account, Databases } from 'appwrite';
+import { Client, Account, Databases, Storage } from 'appwrite';
 
 const client = new Client();
 
@@ -10,6 +10,7 @@ if (typeof window !== 'undefined') {
 
 const account = new Account(client);
 const database = new Databases(client);
+const storage = new Storage(client);
 
-export { client, account, database };
+export { client, account, database, storage };
 export default client;

@@ -1,18 +1,28 @@
 "use client";
 import React, { useState } from "react";
-import ChartsBox from "@/components/ChartsBox";
 import HeaderBox from "@/components/HeaderBox";
 import TotalBalanceBox from "@/components/TotalBalanceBox";
 import LastTransactionsWidget from "@/components/LastTransactionsWidget";
 import { mockCategoriesData } from "@/constants/index";
+import { useUser } from "@/context/UserContext";
+import dynamic from "next/dynamic";
+import {formatEuroCents} from "@/lib/format";
 
 const Home = () => {
-  const loggedIn = { firstName: "Jan", lastName: "Eberwein" };
+  const { user, loading } = useUser();
 
   const [amount, setAmount] = useState("");
   const [selectedAccount, setSelectedAccount] = useState("");
   const [customAccount, setCustomAccount] = useState("");
   const [step, setStep] = useState<"input" | "confirm">("input");
+
+
+  // dynamically load ChartsBox only on the client
+  const ChartsBox = dynamic(
+      () => import("@/components/ChartsBox"),
+      { ssr: false, loading: () => <div>Loading charts…</div> }
+  );
+
 
   // Example accounts
   const accounts = ["Jan Eberwein", ,"Johannes Eder", "Sophie Bachmayr",  "Custom"];
@@ -36,10 +46,15 @@ const Home = () => {
         <HeaderBox
           type="greeting"
           title="Welcome"
-          user={loggedIn?.firstName || "User"}
+          user={user?.userId ?? "User"}
           subtext="Dashboard"
         />
-        <TotalBalanceBox balance={"10000.00"} />
+        {loading || user == null ? (
+            <p>Loading…</p>
+        ) : (
+            <TotalBalanceBox balance={user.balance / 100} />
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="lasttransactions h-full flex flex-col">
             <LastTransactionsWidget />

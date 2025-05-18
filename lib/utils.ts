@@ -230,3 +230,11 @@ export const mapTransactionApiToTransaction = (
   date: new Date(transaction.transaction_date).toISOString(),
   $createdAt: new Date(transaction.transaction_date).toISOString(),
 });
+
+export function generateCardNumber(): string {
+  return Array.from({ length: 12 }, () => Math.floor(Math.random() * 10)).join('');
+}
+
+export function formatCardNumber(cardNumber: string): string {
+  return cardNumber.replace(/(\d{4})(?=\d)/g, "$1 ").trim();
+}
