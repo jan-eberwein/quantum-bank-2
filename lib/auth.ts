@@ -1,6 +1,6 @@
-import { account, database } from "@/lib/appwrite";
-import { ID, Permission, Role } from "appwrite";
-import { generateCardNumber } from "@/lib/utils";
+import {account, database} from "@/lib/appwrite";
+import {ID, Permission, Role} from "appwrite";
+import {generateCardNumber} from "@/lib/utils";
 
 
 export async function signUpAndCreateProfile(userId: string, email: string, password: string) {
@@ -23,7 +23,11 @@ export async function signUpAndCreateProfile(userId: string, email: string, pass
             email: current.email,
             profileImageId: null,
             balance: 0,
-            cardNumber: generateCardNumber()
+            cardNumber: generateCardNumber(),
+            darkModeEnabled: false,
+            generalNotificationsEnabled: true,
+            securityNotificationsEnabled: true,
+            updateNotificationsEnabled: true,
         },
         [
             Permission.read(Role.user(current.$id)),

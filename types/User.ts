@@ -5,4 +5,8 @@ export interface UserProfile {
     profileImageId: string | null;
     balance: number;
     cardNumber: string;
+    darkModeEnabled: boolean;
+    generalNotificationsEnabled: boolean;
+    securityNotificationsEnabled: boolean;
+    updateNotificationsEnabled: boolean;
 }

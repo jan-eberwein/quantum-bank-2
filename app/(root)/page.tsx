@@ -42,6 +42,8 @@ const Home = () => {
   const categorySpendingData = mockCategoriesData.map((item) => item.amount);
   const categoryLabels = mockCategoriesData.map((item) => item.category);
 
+
+
   return (
     <div className="home-content">
       <header className="home-header">
