@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { signUpAndCreateProfile, signIn } from "@/lib/auth";
+import { useUser } from "@/context/UserContext";
 
 interface AuthFormProps {
   type: "sign-in" | "sign-up";
@@ -20,6 +21,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ type }) => {
   const [error, setError] = useState<string | null>(null);
 
   const router = useRouter();
+  const { refreshUser } = useUser();
 
   const validateEmail = (email: string) =>
       /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -55,6 +57,9 @@ const AuthForm: React.FC<AuthFormProps> = ({ type }) => {
       } else {
         await signIn(email, password);
       }
+
+      // Refresh global user context now that authentication has succeeded
+      await refreshUser();
 
       router.push("/");
     } catch (err: any) {
