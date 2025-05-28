@@ -1,51 +1,73 @@
+// components/ProfileImageUploader.tsx
 "use client";
 
-import React from "react";
-import Image from "next/image";
+import React, { useState } from "react";
+import { storage } from "@/lib/appwrite";
 import { getProfileImageUrl } from "@/lib/storage";
+import { BUCKET_ID } from "@/lib/appwrite"; // ensure you export your BUCKET_ID from lib/appwrite
 import { useUser } from "@/context/UserContext";
-import { useProfileImageUpload } from "@/hooks/useProfileImageUpload";
-import { Button } from "@/components/ui/button";
+import { updateUserProfile } from "@/lib/user";
+import Image from "next/image";
+import {ID} from "appwrite";
 
-const ProfileImageUploader: React.FC = () => {
-    const { user } = useUser();
-    const { uploadProfileImage, isUploading, error } = useProfileImageUpload();
+export default function ProfileImageUploader() {
+    const { user, refreshUser } = useUser();
+    const [uploading, setUploading] = useState(false);
+    const [previewSrc, setPreviewSrc] = useState<string | null>(null);
 
-    const currentImageSrc = user?.profileImageId
-        ? getProfileImageUrl(user.profileImageId)
-        : "/icons/user-icon.png";
+    if (!user) return null;
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setUploading(true);
+
+        try {
+            // upload to Appwrite storage
+            const res = await storage.createFile(
+                BUCKET_ID,
+                ID.unique(),   // you’ll need `import { ID } from "appwrite"`
+                file
+            );
+
+            // update user doc with new file id
+            await updateUserProfile(user.$id, { profileImageId: res.$id });
+
+            // refresh context / UI
+            await refreshUser();
+        } catch (err) {
+            console.error("Upload failed:", err);
+        } finally {
+            setUploading(false);
+        }
+    };
 
     return (
-        <div className="border p-4 rounded-md shadow-sm flex items-center gap-4">
+        <div className="mb-4 flex items-center gap-4">
             <div className="relative w-16 h-16 rounded-full overflow-hidden bg-gray-100">
-                <Image
-                    src={currentImageSrc}
-                    alt="Profile"
-                    fill
-                    className="object-cover"
-                />
-            </div>
-            <div className="flex-1">
-                <label>
-                    <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={uploadProfileImage}
-                        disabled={isUploading}
+                {user.profileImageId || previewSrc ? (
+                    <Image
+                        src={previewSrc ?? getProfileImageUrl(user.profileImageId!)}
+                        alt="Profile"
+                        fill
+                        className="object-cover"
                     />
-                    <Button variant="outline" size="sm" asChild>
-                        <span>{isUploading ? "Uploading..." : "Change Photo"}</span>
-                    </Button>
-                </label>
-                {error && (
-                    <p className="mt-2 text-sm text-red-600">
-                        {error}
-                    </p>
+                ) : (
+                    <div className="flex h-full w-full items-center justify-center text-gray-400">
+                        No Photo
+                    </div>
                 )}
             </div>
+            <label className="cursor-pointer text-sm font-medium text-blue-600 hover:underline">
+                {uploading ? "Uploading…" : "Change Photo"}
+                <input
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    onChange={handleFileChange}
+                    disabled={uploading}
+                />
+            </label>
         </div>
     );
-};
-
-export default ProfileImageUploader;
+}

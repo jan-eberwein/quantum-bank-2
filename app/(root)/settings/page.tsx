@@ -1,18 +1,21 @@
+// app/(root)/settings/page.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useCopilotAction, useCopilotReadable } from "@copilotkit/react-core";
 import HeaderBox from "@/components/HeaderBox";
-import { FiCheckCircle, FiXCircle } from "react-icons/fi";
-import { useUser } from "@/context/UserContext";
-import { updateUserPreferences } from "@/lib/user";
 import ProfileImageUploader from "@/components/ProfileImageUploader";
+import { useUser } from "@/context/UserContext";
+import { updateUserPreferences, updateUserProfile } from "@/lib/user";
+import { useCopilotAction, useCopilotReadable } from "@copilotkit/react-core";
+import { FiCheckCircle, FiXCircle } from "react-icons/fi";
 
-const Page = () => {
+const SettingsPage = () => {
     const { user, loading, refreshUser } = useUser();
+    const [username, setUsername] = useState("");
+    const [email, setEmail] = useState("");
+    const [savingProfile, setSavingProfile] = useState(false);
+
     const [settings, setSettings] = useState({
-        username: "",
-        email: "",
         darkMode: false,
         notifications: {
             all: false,
@@ -21,94 +24,102 @@ const Page = () => {
             updates: false,
         },
     });
+    const [toggling, setToggling] = useState<{ [k: string]: boolean }>({});
 
-    // Populate from real user once loaded
+    // Initialize profile + settings state
     useEffect(() => {
         if (!loading && user) {
-            const general = user.generalNotificationsEnabled;
-            const security = user.securityNotificationsEnabled;
-            const updates = user.updateNotificationsEnabled;
+            setUsername(user.userId);
+            setEmail(user.email);
             setSettings({
-                username: user.userId,
-                email: user.email,
                 darkMode: user.darkModeEnabled,
                 notifications: {
-                    general,
-                    security,
-                    updates,
-                    all: general && security && updates,
+                    general: user.generalNotificationsEnabled,
+                    security: user.securityNotificationsEnabled,
+                    updates: user.updateNotificationsEnabled,
+                    all:
+                        user.generalNotificationsEnabled &&
+                        user.securityNotificationsEnabled &&
+                        user.updateNotificationsEnabled,
                 },
             });
         }
     }, [loading, user]);
 
-    // Handle toggles for notifications
-    const handleToggle = async (
-        category: keyof typeof settings.notifications
-    ) => {
-        let newNotifications = { ...settings.notifications };
-
-        if (category === "all") {
-            const newVal = !newNotifications.all;
-            newNotifications = {
-                all: newVal,
-                general: newVal,
-                security: newVal,
-                updates: newVal,
-            };
-        } else {
-            newNotifications = {
-                ...newNotifications,
-                [category]: !newNotifications[category],
-                all: Object.values({
-                    ...newNotifications,
-                    [category]: !newNotifications[category],
-                }).every((v) => v),
-            };
-        }
-
-        setSettings((s) => ({
-            ...s,
-            notifications: newNotifications,
-        }));
-
+    // Save username + email
+    const handleSaveProfile = async () => {
         if (!user) return;
-
-        if (category === "all") {
-            await updateUserPreferences(user.$id, {
-                generalNotificationsEnabled: newNotifications.general,
-                securityNotificationsEnabled: newNotifications.security,
-                updateNotificationsEnabled: newNotifications.updates,
-            });
-        } else {
-            const fieldMap = {
-                general: "generalNotificationsEnabled",
-                security: "securityNotificationsEnabled",
-                updates: "updateNotificationsEnabled",
-            } as const;
-            const fieldName = fieldMap[category];
-            await updateUserPreferences(user.$id, {
-                [fieldName]: newNotifications[category],
-            });
+        setSavingProfile(true);
+        try {
+            await updateUserProfile(user.$id, { userId: username, email });
+            await refreshUser(true);
+        } catch (err) {
+            console.error("Failed to update profile:", err);
+        } finally {
+            setSavingProfile(false);
         }
-
-        await refreshUser();
     };
 
-    // Handle account settings update (dark mode)
-    const handleAccountToggle = async () => {
-        const newVal = !settings.darkMode;
-        setSettings((s) => ({
-            ...s,
-            darkMode: newVal,
-        }));
-
+    // Toggle dark mode
+    const handleDarkModeToggle = async () => {
         if (!user) return;
-        await updateUserPreferences(user.$id, {
-            darkModeEnabled: newVal,
-        });
+        const newVal = !settings.darkMode;
+        setSettings((s) => ({ ...s, darkMode: newVal }));
+        setToggling((t) => ({ ...t, darkMode: true }));
+        try {
+            await updateUserPreferences(user.$id, { darkModeEnabled: newVal });
+            await refreshUser(true);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setToggling((t) => ({ ...t, darkMode: false }));
+        }
+    };
 
-        await refreshUser();
+    // Toggle notifications
+    const handleNotificationToggle = async (
+        key: keyof typeof settings.notifications
+    ) => {
+        if (!user) return;
+        // prepare new notifications object
+        let next = { ...settings.notifications };
+        if (key === "all") {
+            const newAll = !next.all;
+            next = { all: newAll, general: newAll, security: newAll, updates: newAll };
+        } else {
+            next[key] = !next[key];
+            next.all =
+                next.general && next.security && next.updates;
+        }
+        setSettings((s) => ({ ...s, notifications: next }));
+        setToggling((t) => ({ ...t, [key]: true }));
+
+        // map keys to user doc fields
+        const fieldMap = {
+            general: "generalNotificationsEnabled",
+            security: "securityNotificationsEnabled",
+            updates: "updateNotificationsEnabled",
+        } as const;
+
+        try {
+            if (key === "all") {
+                await updateUserPreferences(user.$id, {
+                    generalNotificationsEnabled: next.general,
+                    securityNotificationsEnabled: next.security,
+                    updateNotificationsEnabled: next.updates,
+                });
+            } else {
+                const fieldName = fieldMap[key];
+                await updateUserPreferences(user.$id, {
+                    [fieldName]: next[key],
+                });
+            }
+            await refreshUser(true);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setToggling((t) => ({ ...t, [key]: false }));
+        }
     };
 
     // Sync with CopilotKit
@@ -116,8 +127,11 @@ const Page = () => {
         description: "User's account and notification settings",
         value: settings,
     });
+    useCopilotReadable({
+        description: "User profile information",
+        value: { username, email },
+    });
 
-    // Define Copilot action for updates
     useCopilotAction({
         name: "updateSettings",
         description: "Update user account or notification settings",
@@ -125,72 +139,90 @@ const Page = () => {
             {
                 name: "setting",
                 type: "string",
-                description: "The setting key to update (e.g., darkMode, general, security, updates)",
+                description:
+                    "The setting key to update (darkMode, all/general/security/updates notifications)",
                 required: true,
             },
             {
                 name: "value",
                 type: "boolean",
-                description: "The new value for the setting",
+                description: "New value for the setting",
                 required: true,
             },
         ],
         handler: async ({ setting, value }: { setting: string; value: boolean }) => {
-            console.log(`Copilot wants to update ${setting} →`, value);
-
             if (setting === "darkMode") {
-                await handleAccountToggle();
-                console.log("Dark mode updated via Copilot");
-            } else if (setting in settings.notifications) {
-                await handleToggle(setting as keyof typeof settings.notifications);
-                console.log(`Notification "${setting}" updated via Copilot`);
+                await handleDarkModeToggle();
+            } else if (["all", "general", "security", "updates"].includes(setting)) {
+                await handleNotificationToggle(
+                    setting as keyof typeof settings.notifications
+                );
             } else {
                 console.warn("Unsupported setting key:", setting);
             }
         },
     });
 
+    if (loading || !user) {
+        return <p>Loading settings…</p>;
+    }
+
     return (
-        <div className="settings-page">
+        <div className="settings-page space-y-8 p-8 bg-gray-25">
             <HeaderBox title="Settings" subtext="Manage your account and preferences" />
 
-            <hr className="my-2 border-gray-300" />
+            {/* Profile Picture */}
+            <section>
+                <h3 className="text-2xl font-semibold mb-2">Profile Picture</h3>
+                <ProfileImageUploader />
+            </section>
 
-            {/* Account Settings */}
-            <h3 className="text-2xl font-semibold">Account Settings</h3>
-            <div className="mt-4 space-y-4">
-                {/* Username */}
-                <div className="border p-4 rounded-md shadow-sm flex justify-between">
+            <hr className="border-gray-300" />
+
+            {/* Username & Email */}
+            <section className="space-y-4">
+                <h3 className="text-2xl font-semibold">Account Information</h3>
+                <div className="max-w-md space-y-4">
                     <div>
-                        <h3 className="text-lg font-medium">Username</h3>
-                        <p className="text-sm text-gray-600">{settings.username}</p>
+                        <label className="block font-medium mb-1">Username</label>
+                        <input
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            className="w-full border rounded-md px-3 py-2"
+                        />
                     </div>
-                </div>
-
-                {/* Email */}
-                <div className="border p-4 rounded-md shadow-sm flex justify-between">
                     <div>
-                        <h3 className="text-lg font-medium">Email</h3>
-                        <p className="text-sm text-gray-600">{settings.email}</p>
-                    </div>
-                </div>
-
-                {/* Profile Picture Upload */}
-                <div className="border p-4 rounded-md shadow-sm">
-                    <h3 className="text-lg font-medium">Profile Picture</h3>
-                    <ProfileImageUploader />
-                </div>
-
-                {/* Dark Mode */}
-                <div className="border p-4 rounded-md shadow-sm flex justify-between items-center">
-                    <div>
-                        <h3 className="text-lg font-medium">Dark Mode</h3>
-                        <p className="text-sm text-gray-600">
-                            Toggle between light and dark mode.
-                        </p>
+                        <label className="block font-medium mb-1">Email</label>
+                        <input
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="w-full border rounded-md px-3 py-2"
+                        />
                     </div>
                     <button
-                        onClick={handleAccountToggle}
+                        onClick={handleSaveProfile}
+                        disabled={savingProfile}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                    >
+                        {savingProfile ? "Saving…" : "Save Changes"}
+                    </button>
+                </div>
+            </section>
+
+            <hr className="border-gray-300" />
+
+            {/* Account Settings */}
+            <section className="space-y-4">
+                <h3 className="text-2xl font-semibold">Account Settings</h3>
+                <div className="border p-4 rounded-md flex justify-between items-center">
+                    <div>
+                        <h4 className="text-lg font-medium">Dark Mode</h4>
+                        <p className="text-sm text-gray-600">Toggle light/dark theme</p>
+                    </div>
+                    <button
+                        onClick={handleDarkModeToggle}
+                        disabled={toggling.darkMode}
                         className={`px-4 py-2 rounded-md text-white ${
                             settings.darkMode ? "bg-gray-800" : "bg-blue-500"
                         }`}
@@ -198,23 +230,23 @@ const Page = () => {
                         {settings.darkMode ? "Enabled" : "Disabled"}
                     </button>
                 </div>
-            </div>
+            </section>
 
-            <hr className="my-2 border-gray-300" />
+            <hr className="border-gray-300" />
 
             {/* Notifications */}
-            <h3 className="text-2xl font-semibold">Notifications</h3>
-            <div className="mt-4 space-y-4">
-                {/* Enable All Notifications */}
-                <div className="border p-4 rounded-md shadow-sm flex justify-between items-center">
+            <section className="space-y-4">
+                <h3 className="text-2xl font-semibold">Notifications</h3>
+
+                {/* Enable All */}
+                <div className="border p-4 rounded-md flex justify-between items-center">
                     <div>
-                        <h3 className="text-lg font-medium">Enable All Notifications</h3>
-                        <p className="text-sm text-gray-600">
-                            Turn on/off all notifications at once.
-                        </p>
+                        <h4 className="text-lg font-medium">Enable All Notifications</h4>
+                        <p className="text-sm text-gray-600">Turn on/off all notifications</p>
                     </div>
                     <button
-                        onClick={() => handleToggle("all")}
+                        onClick={() => handleNotificationToggle("all")}
+                        disabled={toggling.all}
                         className={`px-4 py-2 rounded-md text-white ${
                             settings.notifications.all ? "bg-green-500" : "bg-red-500"
                         }`}
@@ -223,62 +255,59 @@ const Page = () => {
                     </button>
                 </div>
 
-                {/* Individual Notifications */}
-                {[
-                    "general",
-                    "security",
-                    "updates",
-                ].map((category) => (
+                {/* Individual */}
+                {(["general", "security", "updates"] as const).map((cat) => (
                     <div
-                        key={category}
-                        className="border p-4 rounded-md shadow-sm flex justify-between items-center"
+                        key={cat}
+                        className="border p-4 rounded-md flex justify-between items-center"
                     >
                         <div>
-                            <h3 className="text-lg font-regular capitalize">
-                                {category} Notifications
-                            </h3>
+                            <h4 className="text-lg font-medium capitalize">
+                                {cat} Notifications
+                            </h4>
                             <p className="text-sm text-gray-600">
-                                {category === "general"
+                                {cat === "general"
                                     ? "General updates and alerts."
-                                    : category === "security"
+                                    : cat === "security"
                                         ? "Security alerts for your account."
                                         : "App feature updates and releases."}
                             </p>
                         </div>
                         <button
-                            onClick={() => handleToggle(category as keyof typeof settings.notifications)}
+                            onClick={() => handleNotificationToggle(cat)}
+                            disabled={toggling[cat]}
                             className={`px-4 py-2 rounded-md text-white ${
-                                settings.notifications[category as keyof typeof settings.notifications]
-                                    ? "bg-green-500"
-                                    : "bg-red-500"
+                                settings.notifications[cat] ? "bg-green-500" : "bg-red-500"
                             }`}
                         >
-                            {settings.notifications[category as keyof typeof settings.notifications]
-                                ? "Enabled"
-                                : "Disabled"}
+                            {settings.notifications[cat] ? "Enabled" : "Disabled"}
                         </button>
                     </div>
                 ))}
-            </div>
+            </section>
 
-            {/* Current Notification Status */}
-            <div className="mt-6">
-                <h3 className="text-lg font-semibold">Current Notification Status:</h3>
-                <div className="flex gap-4 mt-2">
-                    {Object.entries(settings.notifications).map(([key, value]) => (
-                        <div key={key} className="flex items-center space-x-2">
-                            {value ? (
-                                <FiCheckCircle className="text-green-500 text-xl" />
+            <hr className="border-gray-300" />
+
+            {/* Current Status Display */}
+            <section>
+                <h3 className="text-lg font-semibold mb-2">
+                    Current Notification Status
+                </h3>
+                <div className="flex flex-wrap gap-4">
+                    {Object.entries(settings.notifications).map(([key, val]) => (
+                        <div key={key} className="flex items-center gap-2">
+                            {val ? (
+                                <FiCheckCircle className="text-green-500" />
                             ) : (
-                                <FiXCircle className="text-red-500 text-xl" />
+                                <FiXCircle className="text-red-500" />
                             )}
                             <span className="capitalize">{key}</span>
                         </div>
                     ))}
                 </div>
-            </div>
+            </section>
         </div>
     );
 };
 
-export default Page;
+export default SettingsPage;
