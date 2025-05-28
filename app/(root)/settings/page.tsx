@@ -1,14 +1,15 @@
 "use client";
 
-import React, {useEffect, useState} from "react";
-import {useCopilotAction, useCopilotReadable} from "@copilotkit/react-core";
+import React, { useEffect, useState } from "react";
+import { useCopilotAction, useCopilotReadable } from "@copilotkit/react-core";
 import HeaderBox from "@/components/HeaderBox";
-import {FiCheckCircle, FiXCircle} from "react-icons/fi";
-import {useUser} from "@/context/UserContext";
-import {updateUserPreferences} from "@/lib/user"; // Import icons for status indicators
+import { FiCheckCircle, FiXCircle } from "react-icons/fi";
+import { useUser } from "@/context/UserContext";
+import { updateUserPreferences } from "@/lib/user";
+import ProfileImageUploader from "@/components/ProfileImageUploader";
 
 const Page = () => {
-    const {user, loading, refreshUser} = useUser();
+    const { user, loading, refreshUser } = useUser();
     const [settings, setSettings] = useState({
         username: "",
         email: "",
@@ -41,11 +42,11 @@ const Page = () => {
         }
     }, [loading, user]);
 
-
-// Handle toggles for all settings
-    const handleToggle = async (category: keyof typeof settings.notifications) => {
-        // 1) compute new local state
-        let newNotifications = {...settings.notifications};
+    // Handle toggles for notifications
+    const handleToggle = async (
+        category: keyof typeof settings.notifications
+    ) => {
+        let newNotifications = { ...settings.notifications };
 
         if (category === "all") {
             const newVal = !newNotifications.all;
@@ -66,13 +67,11 @@ const Page = () => {
             };
         }
 
-        // 2) update local UI
         setSettings((s) => ({
             ...s,
             notifications: newNotifications,
         }));
 
-        // 3) persist to Appwrite
         if (!user) return;
 
         if (category === "all") {
@@ -82,46 +81,35 @@ const Page = () => {
                 updateNotificationsEnabled: newNotifications.updates,
             });
         } else {
-            // map our key to the actual Appwrite field
             const fieldMap = {
                 general: "generalNotificationsEnabled",
                 security: "securityNotificationsEnabled",
                 updates: "updateNotificationsEnabled",
             } as const;
-            const fieldName = fieldMap[category] as
-                | "generalNotificationsEnabled"
-                | "securityNotificationsEnabled"
-                | "updateNotificationsEnabled";
-
+            const fieldName = fieldMap[category];
             await updateUserPreferences(user.$id, {
                 [fieldName]: newNotifications[category],
             });
         }
 
-        // 4) refresh global user context
         await refreshUser();
     };
 
-
-// Handle account settings update (dark mode)
+    // Handle account settings update (dark mode)
     const handleAccountToggle = async () => {
-        // 1) flip locally
         const newVal = !settings.darkMode;
         setSettings((s) => ({
             ...s,
             darkMode: newVal,
         }));
 
-        // 2) persist to Appwrite
         if (!user) return;
         await updateUserPreferences(user.$id, {
             darkModeEnabled: newVal,
         });
 
-        // 3) refresh global user context
         await refreshUser();
     };
-
 
     // Sync with CopilotKit
     useCopilotReadable({
@@ -129,7 +117,7 @@ const Page = () => {
         value: settings,
     });
 
-// Define Copilot action for updates
+    // Define Copilot action for updates
     useCopilotAction({
         name: "updateSettings",
         description: "Update user account or notification settings",
@@ -151,11 +139,9 @@ const Page = () => {
             console.log(`Copilot wants to update ${setting} →`, value);
 
             if (setting === "darkMode") {
-                // dark mode toggle
                 await handleAccountToggle();
                 console.log("Dark mode updated via Copilot");
             } else if (setting in settings.notifications) {
-                // notification toggle (all, general, security, updates)
                 await handleToggle(setting as keyof typeof settings.notifications);
                 console.log(`Notification "${setting}" updated via Copilot`);
             } else {
@@ -164,16 +150,16 @@ const Page = () => {
         },
     });
 
-
     return (
         <div className="settings-page">
-            <HeaderBox title="Settings" subtext="Manage your account and preferences"/>
+            <HeaderBox title="Settings" subtext="Manage your account and preferences" />
 
-            <hr className="my-2 border-gray-300"/>
+            <hr className="my-2 border-gray-300" />
 
             {/* Account Settings */}
             <h3 className="text-2xl font-semibold">Account Settings</h3>
             <div className="mt-4 space-y-4">
+                {/* Username */}
                 <div className="border p-4 rounded-md shadow-sm flex justify-between">
                     <div>
                         <h3 className="text-lg font-medium">Username</h3>
@@ -181,6 +167,7 @@ const Page = () => {
                     </div>
                 </div>
 
+                {/* Email */}
                 <div className="border p-4 rounded-md shadow-sm flex justify-between">
                     <div>
                         <h3 className="text-lg font-medium">Email</h3>
@@ -188,6 +175,13 @@ const Page = () => {
                     </div>
                 </div>
 
+                {/* Profile Picture Upload */}
+                <div className="border p-4 rounded-md shadow-sm">
+                    <h3 className="text-lg font-medium">Profile Picture</h3>
+                    <ProfileImageUploader />
+                </div>
+
+                {/* Dark Mode */}
                 <div className="border p-4 rounded-md shadow-sm flex justify-between items-center">
                     <div>
                         <h3 className="text-lg font-medium">Dark Mode</h3>
@@ -204,19 +198,20 @@ const Page = () => {
                         {settings.darkMode ? "Enabled" : "Disabled"}
                     </button>
                 </div>
-
             </div>
 
-            <hr className="my-2 border-gray-300"/>
+            <hr className="my-2 border-gray-300" />
 
             {/* Notifications */}
             <h3 className="text-2xl font-semibold">Notifications</h3>
             <div className="mt-4 space-y-4">
-                {/* Toggle All */}
+                {/* Enable All Notifications */}
                 <div className="border p-4 rounded-md shadow-sm flex justify-between items-center">
                     <div>
                         <h3 className="text-lg font-medium">Enable All Notifications</h3>
-                        <p className="text-sm text-gray-600">Turn on/off all notifications at once.</p>
+                        <p className="text-sm text-gray-600">
+                            Turn on/off all notifications at once.
+                        </p>
                     </div>
                     <button
                         onClick={() => handleToggle("all")}
@@ -229,10 +224,19 @@ const Page = () => {
                 </div>
 
                 {/* Individual Notifications */}
-                {["general", "security", "updates"].map((category) => (
-                    <div key={category} className="border p-4 rounded-md shadow-sm flex justify-between items-center">
+                {[
+                    "general",
+                    "security",
+                    "updates",
+                ].map((category) => (
+                    <div
+                        key={category}
+                        className="border p-4 rounded-md shadow-sm flex justify-between items-center"
+                    >
                         <div>
-                            <h3 className="text-lg font-medium capitalize">{category} Notifications</h3>
+                            <h3 className="text-lg font-regular capitalize">
+                                {category} Notifications
+                            </h3>
                             <p className="text-sm text-gray-600">
                                 {category === "general"
                                     ? "General updates and alerts."
@@ -249,20 +253,25 @@ const Page = () => {
                                     : "bg-red-500"
                             }`}
                         >
-                            {settings.notifications[category as keyof typeof settings.notifications] ? "Enabled" : "Disabled"}
+                            {settings.notifications[category as keyof typeof settings.notifications]
+                                ? "Enabled"
+                                : "Disabled"}
                         </button>
                     </div>
                 ))}
             </div>
 
-            {/* Display current settings visually */}
+            {/* Current Notification Status */}
             <div className="mt-6">
                 <h3 className="text-lg font-semibold">Current Notification Status:</h3>
                 <div className="flex gap-4 mt-2">
                     {Object.entries(settings.notifications).map(([key, value]) => (
                         <div key={key} className="flex items-center space-x-2">
-                            {value ? <FiCheckCircle className="text-green-500 text-xl"/> :
-                                <FiXCircle className="text-red-500 text-xl"/>}
+                            {value ? (
+                                <FiCheckCircle className="text-green-500 text-xl" />
+                            ) : (
+                                <FiXCircle className="text-red-500 text-xl" />
+                            )}
                             <span className="capitalize">{key}</span>
                         </div>
                     ))}
