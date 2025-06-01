@@ -4,12 +4,9 @@ import { Client, Account, Databases, Storage, ID as AppwriteID } from "appwrite"
 //
 // —–– 1) initialize the client
 //
-const client = new Client();
-if (typeof window !== "undefined") {
-  client
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!);
-}
+const client = new Client()
+    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)        // ← always set
+    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!);     // ← always set
 
 //
 // —–– 2) export the Appwrite services

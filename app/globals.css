@@ -594,3 +594,17 @@ select {
     --chart-2: 160 60% 45%;
   }
 }*/
+
+/* ──────────────────────────────────────────────────────────
+   Extra spacing before/after the Transactions filter area
+   ────────────────────────────────────────────────────────── */
+@layer utilities {
+  /*
+    Use this class around your <TransactionTableFilterArea>
+    to introduce extra vertical whitespace (margin) above
+    and below it.
+  */
+  .transaction-filter-wrapper {
+    @apply mt-8 mb-8; /* 2rem (32px) top & bottom */
+  }
+}
