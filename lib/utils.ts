@@ -79,14 +79,35 @@ export const formatDateTime = (dateString: Date) => {
 };
 
 
-export function formatAmount(amount: number): string {
+/**
+ * Format amount from cents to EUR currency
+ * @param amountInCents - Amount in cents (integer)
+ * @returns Formatted currency string
+ */
+export function formatAmount(amountInCents: number): string {
   const formatter = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "EUR",
     minimumFractionDigits: 2,
   });
 
-  return formatter.format(amount);
+  // Convert cents to euros by dividing by 100
+  return formatter.format(amountInCents / 100);
+}
+
+/**
+ * Format amount from cents to EUR with proper locale (German format)
+ * @param amountInCents - Amount in cents (integer)
+ * @returns Formatted currency string in German locale
+ */
+export function formatAmountEuro(amountInCents: number): string {
+  const formatter = new Intl.NumberFormat("de-DE", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 2,
+  });
+
+  return formatter.format(amountInCents / 100);
 }
 
 export const parseStringify = (value: any) => JSON.parse(JSON.stringify(value));
