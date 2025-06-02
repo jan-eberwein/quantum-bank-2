@@ -1,4 +1,5 @@
-'use client';
+// app/(root)/transactions/page.tsx
+"use client";
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -6,7 +7,7 @@ import HeaderBox from '@/components/HeaderBox';
 import { Pagination } from '@/components/Pagination';
 import TransactionTable from '@/components/TransactionTable';
 import TransactionTableFilterArea from '@/components/TransactionTableFilterArea';
-import { useCopilotReadable } from '@copilotkit/react-core';
+import { useCopilotReadable, useCopilotAction } from '@copilotkit/react-core';
 import useUser from '@/hooks/useUser';
 import useTransactions from '@/hooks/useTransactions';
 import useTransactionStatuses from '@/hooks/useTransactionStatuses';
@@ -108,10 +109,15 @@ export default function TransactionsPage() {
                 const transactionDate = new Date(t.createdAt);
 
                 if (dateFilter.from && dateFilter.to) {
-                    return transactionDate >= dateFilter.from && transactionDate <= dateFilter.to;
+                    return (
+                        transactionDate >= dateFilter.from &&
+                        transactionDate <= dateFilter.to
+                    );
                 }
                 if (dateFilter.from) {
-                    return transactionDate.toDateString() === dateFilter.from.toDateString();
+                    return (
+                        transactionDate.toDateString() === dateFilter.from.toDateString()
+                    );
                 }
                 return true;
             });
@@ -129,22 +135,295 @@ export default function TransactionsPage() {
     // Pagination calculations
     const totalPages = Math.max(1, Math.ceil(filtered.length / ROWS_PER_PAGE));
     const sliceStart = (currentPage - 1) * ROWS_PER_PAGE;
-    const currentRows = filtered.slice(sliceStart, sliceStart + ROWS_PER_PAGE);
+    const currentRows = filtered.slice(
+        sliceStart,
+        sliceStart + ROWS_PER_PAGE
+    );
 
     // Copilot readable data
     useCopilotReadable({
-        description: "All user transactions",
-        value: transactions
+        description: 'All user transactions with details',
+        value: transactions,
     });
+
     useCopilotReadable({
-        description: "Transactions after filters",
-        value: filtered
+        description: 'Transactions after applying current filters',
+        value: filtered,
     });
+
+    useCopilotReadable({
+        description: 'Current transaction filter settings',
+        value: {
+            searchQuery,
+            selectedCategory,
+            selectedStatus,
+            transactionType,
+            dateFilter,
+            currentPage,
+            totalPages,
+            resultsCount: filtered.length,
+            availableCategories,
+            availableStatuses,
+        },
+    });
+
+    // CopilotKit Actions for transaction filtering
+    useCopilotAction({
+        name: "filterTransactionsByCategory",
+        description: "Filter transactions by category",
+        parameters: [
+            {
+                name: "category",
+                type: "string",
+                description: `Category to filter by. Available: ${availableCategories.join(', ')}`,
+                required: true,
+            },
+        ],
+        handler: async ({ category }) => {
+            if (availableCategories.includes(category)) {
+                setSelectedCategory(category);
+                setHasSearched(true);
+                updateQueryParams('category', category === 'All Categories' ? '' : category);
+            }
+        },
+    });
+
+    useCopilotAction({
+        name: "filterTransactionsByStatus",
+        description: "Filter transactions by status",
+        parameters: [
+            {
+                name: "status",
+                type: "string",
+                description: `Status to filter by. Available: ${availableStatuses.join(', ')}`,
+                required: true,
+            },
+        ],
+        handler: async ({ status }) => {
+            if (availableStatuses.includes(status)) {
+                setSelectedStatus(status);
+                setHasSearched(true);
+                updateQueryParams('status', status === 'All Statuses' ? '' : status);
+            }
+        },
+    });
+
+    useCopilotAction({
+        name: "filterTransactionsByType",
+        description: "Filter transactions by type (incoming/outgoing)",
+        parameters: [
+            {
+                name: "type",
+                type: "string",
+                description: "Type: 'incoming', 'outgoing', or 'Incoming & Outgoing'",
+                required: true,
+            },
+        ],
+        handler: async ({ type }) => {
+            const validTypes = ['incoming', 'outgoing', 'Incoming & Outgoing'];
+            if (validTypes.includes(type)) {
+                setTransactionType(type);
+                setHasSearched(true);
+                updateQueryParams('transactionType', type === 'Incoming & Outgoing' ? '' : type);
+            }
+        },
+    });
+
+    useCopilotAction({
+        name: "searchTransactionsByText",
+        description: "Search transactions by merchant name or description",
+        parameters: [
+            {
+                name: "searchTerm",
+                type: "string",
+                description: "Search term to look for in merchant names and descriptions",
+                required: true,
+            },
+        ],
+        handler: async ({ searchTerm }) => {
+            setSearchQuery(searchTerm);
+            setHasSearched(true);
+            updateQueryParams('searchQuery', searchTerm);
+        },
+    });
+
+    useCopilotAction({
+        name: "filterTransactionsByDateRange",
+        description: "Filter transactions by date range",
+        parameters: [
+            {
+                name: "fromDate",
+                type: "string",
+                description: "Start date (YYYY-MM-DD format)",
+                required: false,
+            },
+            {
+                name: "toDate",
+                type: "string",
+                description: "End date (YYYY-MM-DD format)",
+                required: false,
+            },
+        ],
+        handler: async ({ fromDate, toDate }) => {
+            const newDateFilter: { from?: Date; to?: Date } = {};
+
+            if (fromDate) {
+                const from = new Date(fromDate);
+                if (!isNaN(from.getTime())) {
+                    newDateFilter.from = from;
+                }
+            }
+
+            if (toDate) {
+                const to = new Date(toDate);
+                if (!isNaN(to.getTime())) {
+                    newDateFilter.to = to;
+                }
+            }
+
+            setDateFilter(newDateFilter);
+            setHasSearched(true);
+
+            const dateParam = newDateFilter.from && newDateFilter.to
+                ? `${newDateFilter.from.toISOString()}_${newDateFilter.to.toISOString()}`
+                : newDateFilter.from
+                    ? newDateFilter.from.toISOString()
+                    : '';
+            updateQueryParams('date', dateParam);
+        },
+    });
+
+    useCopilotAction({
+        name: "clearAllFilters",
+        description: "Clear all transaction filters to show all transactions",
+        handler: async () => {
+            setSearchQuery('');
+            setSelectedCategory('All Categories');
+            setSelectedStatus('All Statuses');
+            setTransactionType('Incoming & Outgoing');
+            setDateFilter({});
+            setHasSearched(true);
+            router.push('/transactions');
+        },
+    });
+
+    useCopilotAction({
+        name: "goToTransactionPage",
+        description: "Navigate to a specific page of transactions",
+        parameters: [
+            {
+                name: "pageNumber",
+                type: "string",
+                description: `Page number (1-${totalPages})`,
+                required: true,
+            },
+        ],
+        handler: async ({ pageNumber }) => {
+            const page = parseInt(pageNumber);
+            if (page >= 1 && page <= totalPages) {
+                const params = new URLSearchParams(searchParams.toString());
+                params.set('page', page.toString());
+                router.push(`?${params.toString()}`);
+            }
+        },
+    });
+
+    useCopilotAction({
+        name: "findTransactionsByAmount",
+        description: "Find transactions with a specific amount",
+        parameters: [
+            {
+                name: "amount",
+                type: "string",
+                description: "Amount to search for (e.g., '50.00', '100')",
+                required: true,
+            },
+            {
+                name: "exact",
+                type: "string",
+                description: "Whether to search for exact amount ('true') or similar amounts ('false')",
+                required: false,
+            },
+        ],
+        handler: async ({ amount, exact = "false" }) => {
+            const searchAmount = parseFloat(amount);
+            if (!isNaN(searchAmount)) {
+                if (exact === "true") {
+                    setSearchQuery(amount);
+                } else {
+                    setSearchQuery(amount);
+                }
+                setHasSearched(true);
+                updateQueryParams('searchQuery', amount);
+            }
+        },
+    });
+
+    // Listen for Copilot events from other components
+    useEffect(() => {
+        const handleFilterTransactions = (event: CustomEvent) => {
+            const { searchTerm, category, status, transactionType: type, dateFrom, dateTo } = event.detail;
+
+            if (searchTerm !== undefined) {
+                setSearchQuery(searchTerm);
+                updateQueryParams('searchQuery', searchTerm);
+            }
+
+            if (category && availableCategories.includes(category)) {
+                setSelectedCategory(category);
+                updateQueryParams('category', category === 'All Categories' ? '' : category);
+            }
+
+            if (status && availableStatuses.includes(status)) {
+                setSelectedStatus(status);
+                updateQueryParams('status', status === 'All Statuses' ? '' : status);
+            }
+
+            if (type) {
+                setTransactionType(type);
+                updateQueryParams('transactionType', type === 'Incoming & Outgoing' ? '' : type);
+            }
+
+            if (dateFrom || dateTo) {
+                const newDateFilter: { from?: Date; to?: Date } = {};
+                if (dateFrom) newDateFilter.from = new Date(dateFrom);
+                if (dateTo) newDateFilter.to = new Date(dateTo);
+                setDateFilter(newDateFilter);
+
+                const dateParam = newDateFilter.from && newDateFilter.to
+                    ? `${newDateFilter.from.toISOString()}_${newDateFilter.to.toISOString()}`
+                    : newDateFilter.from
+                        ? newDateFilter.from.toISOString()
+                        : '';
+                updateQueryParams('date', dateParam);
+            }
+
+            setHasSearched(true);
+        };
+
+        const handleClearFilters = () => {
+            setSearchQuery('');
+            setSelectedCategory('All Categories');
+            setSelectedStatus('All Statuses');
+            setTransactionType('Incoming & Outgoing');
+            setDateFilter({});
+            setHasSearched(true);
+            router.push('/transactions');
+        };
+
+        window.addEventListener('copilot-filter-transactions', handleFilterTransactions as EventListener);
+        window.addEventListener('copilot-clear-filters', handleClearFilters);
+
+        return () => {
+            window.removeEventListener('copilot-filter-transactions', handleFilterTransactions as EventListener);
+            window.removeEventListener('copilot-clear-filters', handleClearFilters);
+        };
+    }, [availableCategories, availableStatuses, router, searchParams]);
 
     // Loading state
     if (userLoading || txLoading || statusLoading || catLoading) {
         return (
-            <div className="flex items-center justify-center min-h-[400px]">
+            <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
                     <p className="text-gray-600">Loading transactions...</p>
@@ -155,7 +434,10 @@ export default function TransactionsPage() {
 
     return (
         <div className="p-6">
-            <HeaderBox title="Transactions" subtext="Manage and view your transaction history" />
+            <HeaderBox
+                title="Transactions"
+                subtext="Manage and view your transaction history"
+            />
 
             <div className="transaction-filter-wrapper mt-6">
                 <TransactionTableFilterArea
@@ -165,42 +447,52 @@ export default function TransactionsPage() {
                         setHasSearched(true);
                         updateQueryParams('searchQuery', v);
                     }}
-
                     selectedCategory={selectedCategory}
                     setSelectedCategory={(v) => {
                         setSelectedCategory(v);
                         setHasSearched(true);
-                        updateQueryParams('category', v === 'All Categories' ? '' : v);
+                        updateQueryParams(
+                            'category',
+                            v === 'All Categories' ? '' : v
+                        );
                     }}
                     availableCategories={availableCategories}
-
                     dateFilter={dateFilter}
                     setDateFilter={(range) => {
                         setDateFilter(range);
                         setHasSearched(true);
-                        const dateParam = range.from && range.to
-                            ? `${range.from.toISOString()}_${range.to.toISOString()}`
-                            : range.from
-                                ? range.from.toISOString()
-                                : '';
+                        const dateParam =
+                            range.from && range.to
+                                ? `${range.from.toISOString()}_${range.to.toISOString()}`
+                                : range.from
+                                    ? range.from.toISOString()
+                                    : '';
                         updateQueryParams('date', dateParam);
                     }}
-
                     selectedStatus={selectedStatus}
                     setSelectedStatus={(v) => {
                         setSelectedStatus(v);
                         setHasSearched(true);
-                        updateQueryParams('status', v === 'All Statuses' ? '' : v);
+                        updateQueryParams(
+                            'status',
+                            v === 'All Statuses' ? '' : v
+                        );
                     }}
                     availableStatuses={availableStatuses}
-
                     transactionType={transactionType}
                     setTransactionType={(v) => {
                         setTransactionType(v);
                         setHasSearched(true);
-                        updateQueryParams('transactionType', v === 'Incoming & Outgoing' ? '' : v);
+                        updateQueryParams(
+                            'transactionType',
+                            v === 'Incoming & Outgoing' ? '' : v
+                        );
                     }}
-                    availableTransactionTypes={['Incoming & Outgoing', 'incoming', 'outgoing']}
+                    availableTransactionTypes={[
+                        'Incoming & Outgoing',
+                        'incoming',
+                        'outgoing',
+                    ]}
                 />
             </div>
 
@@ -216,7 +508,7 @@ export default function TransactionsPage() {
                     <>
                         <div className="bg-white rounded-lg shadow-sm border">
                             <TransactionTable
-                                transactions={currentRows}
+                                transactions={currentRows as Transaction[]}
                                 categories={categories}
                                 statuses={statuses}
                             />

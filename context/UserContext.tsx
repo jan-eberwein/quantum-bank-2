@@ -15,7 +15,7 @@ interface UserContextType {
     user: UserProfile | null;
     loading: boolean;
     /**
-     * If `silent` is true, don’t flip the loading spinner.
+     * If `silent` is true, don't flip the loading spinner.
      * Otherwise show it.
      */
     refreshUser: (silent?: boolean) => Promise<void>;
@@ -31,6 +31,20 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
 
+    // Initial load function
+    const loadUser = async () => {
+        setLoading(true);
+        try {
+            const profile = await getCurrentUserProfile();
+            setUser(profile);
+        } catch (err) {
+            console.error("loadUser error:", err);
+            setUser(null);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const refreshUser = useCallback(async (silent: boolean = false) => {
         if (!silent) setLoading(true);
         try {
@@ -38,15 +52,16 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
             setUser(profile);
         } catch (err) {
             console.error("refreshUser error:", err);
+            setUser(null);
         } finally {
             if (!silent) setLoading(false);
         }
     }, []);
 
+    // Load user on mount only
     useEffect(() => {
-        // explicit void to acknowledge we’re intentionally ignoring the Promise
-        void refreshUser();
-    }, [refreshUser]);
+        loadUser();
+    }, []); // No dependencies needed for initial load
 
     return (
         <UserContext.Provider value={{ user, loading, refreshUser }}>

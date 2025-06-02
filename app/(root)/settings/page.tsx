@@ -1,4 +1,3 @@
-// app/(root)/settings/page.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -8,6 +7,30 @@ import { useUser } from "@/context/UserContext";
 import { updateUserPreferences, updateUserProfile } from "@/lib/user";
 import { useCopilotAction, useCopilotReadable } from "@copilotkit/react-core";
 import { FiCheckCircle, FiXCircle } from "react-icons/fi";
+
+// Type definitions for custom events
+interface CopilotUpdateSettingDetail {
+    settingType: string;
+    value: string;
+    notificationType?: string;
+}
+
+interface CopilotToggleSettingDetail {
+    setting: string;
+}
+
+// Enhanced utility functions for different event handler types
+function createEventListener<T>(
+    handler: (event: CustomEvent<T>) => void | Promise<void>
+): EventListener {
+    return (event: Event) => handler(event as CustomEvent<T>);
+}
+
+function createSimpleEventListener(
+    handler: () => void | Promise<void>
+): EventListener {
+    return () => handler();
+}
 
 const SettingsPage = () => {
     const { user, loading, refreshUser } = useUser();
@@ -45,6 +68,28 @@ const SettingsPage = () => {
             });
         }
     }, [loading, user]);
+
+    // Make settings readable by Copilot
+    useCopilotReadable({
+        description: "Current user account settings and preferences",
+        value: {
+            username,
+            email,
+            balance: user?.balance ? user.balance / 100 : 0,
+            cardNumber: user?.cardNumber,
+            darkMode: settings.darkMode,
+            notifications: settings.notifications,
+            profileImageId: user?.profileImageId,
+        },
+    });
+
+    useCopilotReadable({
+        description: "Available notification settings that can be toggled",
+        value: {
+            availableNotificationTypes: ['all', 'general', 'security', 'updates'],
+            currentNotificationStatus: settings.notifications,
+        },
+    });
 
     // Save username + email
     const handleSaveProfile = async () => {
@@ -122,46 +167,254 @@ const SettingsPage = () => {
         }
     };
 
-    // Sync with CopilotKit
-    useCopilotReadable({
-        description: "User's account and notification settings",
-        value: settings,
-    });
-    useCopilotReadable({
-        description: "User profile information",
-        value: { username, email },
-    });
-
+    // CopilotKit Actions
     useCopilotAction({
-        name: "updateSettings",
-        description: "Update user account or notification settings",
+        name: "updateUsername",
+        description: "Update the user's username/display name",
         parameters: [
             {
-                name: "setting",
+                name: "newUsername",
                 type: "string",
-                description:
-                    "The setting key to update (darkMode, all/general/security/updates notifications)",
-                required: true,
-            },
-            {
-                name: "value",
-                type: "boolean",
-                description: "New value for the setting",
+                description: "New username to set",
                 required: true,
             },
         ],
-        handler: async ({ setting, value }: { setting: string; value: boolean }) => {
-            if (setting === "darkMode") {
-                await handleDarkModeToggle();
-            } else if (["all", "general", "security", "updates"].includes(setting)) {
-                await handleNotificationToggle(
-                    setting as keyof typeof settings.notifications
-                );
+        handler: async ({ newUsername }) => {
+            setUsername(newUsername);
+        },
+    });
+
+    useCopilotAction({
+        name: "updateEmail",
+        description: "Update the user's email address",
+        parameters: [
+            {
+                name: "newEmail",
+                type: "string",
+                description: "New email address to set",
+                required: true,
+            },
+        ],
+        handler: async ({ newEmail }) => {
+            setEmail(newEmail);
+        },
+    });
+
+    useCopilotAction({
+        name: "saveProfileChanges",
+        description: "Save changes to username and email",
+        handler: async () => {
+            await handleSaveProfile();
+        },
+    });
+
+    useCopilotAction({
+        name: "toggleDarkMode",
+        description: "Toggle dark mode on or off",
+        parameters: [
+            {
+                name: "enable",
+                type: "string",
+                description: "Whether to enable ('true') or disable ('false') dark mode. If not specified, will toggle current state.",
+                required: false,
+            },
+        ],
+        handler: async ({ enable }) => {
+            if (enable !== undefined) {
+                const shouldEnable = enable.toLowerCase() === 'true';
+                if (shouldEnable !== settings.darkMode) {
+                    await handleDarkModeToggle();
+                }
             } else {
-                console.warn("Unsupported setting key:", setting);
+                await handleDarkModeToggle();
             }
         },
     });
+
+    useCopilotAction({
+        name: "toggleNotifications",
+        description: "Toggle specific notification settings",
+        parameters: [
+            {
+                name: "type",
+                type: "string",
+                description: "Notification type: 'all', 'general', 'security', 'updates'",
+                required: true,
+            },
+            {
+                name: "enable",
+                type: "string",
+                description: "Whether to enable ('true') or disable ('false'). If not specified, will toggle current state.",
+                required: false,
+            },
+        ],
+        handler: async ({ type, enable }) => {
+            const notificationType = type.toLowerCase() as keyof typeof settings.notifications;
+
+            if (!['all', 'general', 'security', 'updates'].includes(notificationType)) {
+                console.error("Invalid notification type:", type);
+                return;
+            }
+
+            if (enable !== undefined) {
+                const shouldEnable = enable.toLowerCase() === 'true';
+                if (shouldEnable !== settings.notifications[notificationType]) {
+                    await handleNotificationToggle(notificationType);
+                }
+            } else {
+                await handleNotificationToggle(notificationType);
+            }
+        },
+    });
+
+    useCopilotAction({
+        name: "enableAllNotifications",
+        description: "Enable all notification types",
+        handler: async () => {
+            if (!settings.notifications.all) {
+                await handleNotificationToggle("all");
+            }
+        },
+    });
+
+    useCopilotAction({
+        name: "disableAllNotifications",
+        description: "Disable all notification types",
+        handler: async () => {
+            if (settings.notifications.all) {
+                await handleNotificationToggle("all");
+            }
+        },
+    });
+
+    useCopilotAction({
+        name: "getAccountBalance",
+        description: "Get the current account balance",
+        handler: async () => {
+            const balance = user?.balance ? user.balance / 100 : 0;
+            return `Current balance: €${balance.toFixed(2)}`;
+        },
+    });
+
+    useCopilotAction({
+        name: "getAccountSettings",
+        description: "Get all current account settings and preferences",
+        handler: async () => {
+            return {
+                username,
+                email,
+                balance: user?.balance ? user.balance / 100 : 0,
+                darkMode: settings.darkMode,
+                notifications: settings.notifications,
+                cardNumber: user?.cardNumber,
+            };
+        },
+    });
+
+    useCopilotAction({
+        name: "resetProfileToDefaults",
+        description: "Reset profile settings to original values",
+        handler: async () => {
+            if (user) {
+                setUsername(user.userId);
+                setEmail(user.email);
+            }
+        },
+    });
+
+    // Fixed event listeners with proper typing using Solution 2
+    useEffect(() => {
+        const handleUpdateSetting = createEventListener<CopilotUpdateSettingDetail>(
+            async (event) => {
+                const { settingType, value, notificationType } = event.detail;
+
+                switch (settingType) {
+                    case 'darkmode':
+                        const enableDark = value.toLowerCase() === 'true';
+                        if (enableDark !== settings.darkMode) {
+                            await handleDarkModeToggle();
+                        }
+                        break;
+
+                    case 'notifications':
+                        if (notificationType && ['all', 'general', 'security', 'updates'].includes(notificationType)) {
+                            const enable = value.toLowerCase() === 'true';
+                            const currentValue = settings.notifications[notificationType as keyof typeof settings.notifications];
+                            if (enable !== currentValue) {
+                                await handleNotificationToggle(notificationType as keyof typeof settings.notifications);
+                            }
+                        }
+                        break;
+
+                    case 'username':
+                        setUsername(value);
+                        break;
+
+                    case 'email':
+                        setEmail(value);
+                        break;
+                }
+            }
+        );
+
+        const handleToggleSetting = createEventListener<CopilotToggleSettingDetail>(
+            async (event) => {
+                const { setting } = event.detail;
+
+                switch (setting) {
+                    case 'darkmode':
+                        await handleDarkModeToggle();
+                        break;
+                    case 'notifications':
+                    case 'generalnotifications':
+                        await handleNotificationToggle('general');
+                        break;
+                    case 'securitynotifications':
+                        await handleNotificationToggle('security');
+                        break;
+                    case 'updatenotifications':
+                        await handleNotificationToggle('updates');
+                        break;
+                    case 'allnotifications':
+                        await handleNotificationToggle('all');
+                        break;
+                }
+            }
+        );
+
+        // Using Solution 2: createSimpleEventListener for handlers that don't need event data
+        const handleGetAccountInfo = createSimpleEventListener(() => {
+            const accountInfo = {
+                username,
+                email,
+                balance: user?.balance ? user.balance / 100 : 0,
+                darkMode: settings.darkMode,
+                notifications: settings.notifications,
+                cardNumber: user?.cardNumber,
+            };
+            console.log("Account Info:", accountInfo);
+            return accountInfo;
+        });
+
+        const handleCheckBalance = createSimpleEventListener(() => {
+            const balance = user?.balance ? user.balance / 100 : 0;
+            console.log(`Current balance: €${balance.toFixed(2)}`);
+            return balance;
+        });
+
+        // Event listener registration
+        window.addEventListener('copilot-update-setting', handleUpdateSetting);
+        window.addEventListener('copilot-toggle-setting', handleToggleSetting);
+        window.addEventListener('copilot-get-account-info', handleGetAccountInfo);
+        window.addEventListener('copilot-check-balance', handleCheckBalance);
+
+        return () => {
+            window.removeEventListener('copilot-update-setting', handleUpdateSetting);
+            window.removeEventListener('copilot-toggle-setting', handleToggleSetting);
+            window.removeEventListener('copilot-get-account-info', handleGetAccountInfo);
+            window.removeEventListener('copilot-check-balance', handleCheckBalance);
+        };
+    }, [settings, username, email, user, handleDarkModeToggle, handleNotificationToggle]);
 
     if (loading || !user) {
         return <p>Loading settings…</p>;
@@ -304,6 +557,35 @@ const SettingsPage = () => {
                             <span className="capitalize">{key}</span>
                         </div>
                     ))}
+                </div>
+            </section>
+
+            {/* Account Summary */}
+            <section className="space-y-4">
+                <h3 className="text-2xl font-semibold">Account Summary</h3>
+                <div className="bg-white p-4 rounded-md border">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <p className="text-sm text-gray-600">Current Balance</p>
+                            <p className="text-xl font-bold text-green-600">
+                                €{user.balance ? (user.balance / 100).toFixed(2) : '0.00'}
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-sm text-gray-600">Card Number</p>
+                            <p className="text-lg font-mono">
+                                {user.cardNumber ? user.cardNumber.replace(/(\d{4})(?=\d)/g, "$1 ").trim() : "—"}
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-sm text-gray-600">Account ID</p>
+                            <p className="text-sm font-mono text-gray-800">{user.$id}</p>
+                        </div>
+                        <div>
+                            <p className="text-sm text-gray-600">Theme</p>
+                            <p className="text-sm">{settings.darkMode ? "Dark Mode" : "Light Mode"}</p>
+                        </div>
+                    </div>
                 </div>
             </section>
         </div>
