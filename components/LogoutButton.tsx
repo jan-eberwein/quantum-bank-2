@@ -1,21 +1,30 @@
+// components/LogoutButton.tsx
 'use client';
 
+import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { signOut } from '@/lib/auth';
 
-const LogoutButton = () => {
+interface LogoutButtonProps {
+  stopCardClickPropagation?: boolean;
+}
+
+const LogoutButton: React.FC<LogoutButtonProps> = ({ stopCardClickPropagation }) => {
   const router = useRouter();
 
-  const handleLogout = async () => {
+  const handleLogout = async (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (stopCardClickPropagation) {
+      event.stopPropagation();
+    }
     await signOut();
     router.push('/sign-in');
   };
 
   return (
-      <Button onClick={handleLogout} className="text-sm">
-        Logout
-      </Button>
+    <Button onClick={handleLogout} className="text-sm">
+      Logout
+    </Button>
   );
 };
 

@@ -9,10 +9,10 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@copilotkit/react-core": "^1.8.12",
-    "@copilotkit/react-textarea": "^1.8.12",
-    "@copilotkit/react-ui": "^1.8.12",
-    "@copilotkit/runtime": "^1.8.12",
+    "@copilotkit/react-core": "^1.8.13",
+    "@copilotkit/react-textarea": "^1.8.13",
+    "@copilotkit/react-ui": "^1.8.13",
+    "@copilotkit/runtime": "^1.8.13",
     "@copilotkit/shared": "^1.8.12",
     "@heroicons/react": "^2.1.5",
     "@hookform/resolvers": "^3.9.1",
