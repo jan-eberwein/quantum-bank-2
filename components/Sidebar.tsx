@@ -1,5 +1,8 @@
+// components/Sidebar.tsx
 "use client";
 
+import React from "react";
+import dynamic from "next/dynamic";
 import { sidebarLinks } from "@/constants";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -8,11 +11,16 @@ import { usePathname, useRouter } from "next/navigation";
 import UserCard from "./UserCard";
 import { useCopilotAction, useCopilotReadable } from "@copilotkit/react-core";
 import { TestShadcnChartCard } from "@/components/TestShadcnChartCard";
-import React from "react";
 import CopilotChartHandler from "./CopilotChartHandler";
 import { format } from "date-fns";
-import LogoutButton from './LogoutButton';
-import CopilotUI from "./CopilotUI";
+import LogoutButton from "./LogoutButton";
+
+// Dynamically import CopilotUI so it only renders on the client
+const CopilotUI = dynamic(() => import("./CopilotUI"), { ssr: false });
+
+interface SidebarProps {
+  user: { [key: string]: any } | null;
+}
 
 const Sidebar = ({ user }: SidebarProps) => {
   const pathname = usePathname();
@@ -124,9 +132,9 @@ const Sidebar = ({ user }: SidebarProps) => {
           );
         })}
       </nav>
-      
-      <CopilotUI/>
 
+      {/* Render CopilotUI only on the client */}
+      <CopilotUI />
 
       <UserCard />
     </section>
