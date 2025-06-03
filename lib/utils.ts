@@ -45,28 +45,28 @@ export const formatDateTime = (dateString: Date) => {
   };
 
   const formattedDateTime: string = new Date(dateString).toLocaleString(
-    "en-US",
-    dateTimeOptions
+      "en-US",
+      dateTimeOptions
   );
 
   const formattedDateDay: string = new Date(dateString).toLocaleString(
-    "en-US",
-    dateDayOptions
+      "en-US",
+      dateDayOptions
   );
 
   const formattedDate: string = new Date(dateString).toLocaleString(
-    "en-US",
-    dateOptions
+      "en-US",
+      dateOptions
   );
 
   const formattedTime: string = new Date(dateString).toLocaleString(
-    "en-US",
-    timeOptions
+      "en-US",
+      timeOptions
   );
 
   const formattedDayMonth: string = new Date(dateString).toLocaleString(
-    "en-US",
-    dayMonthOptions
+      "en-US",
+      dayMonthOptions
   );
 
   return {
@@ -131,11 +131,11 @@ export function formUrlQuery({ params, key, value }: UrlQueryParams) {
   currentUrl[key] = value;
 
   return qs.stringifyUrl(
-    {
-      url: window.location.pathname,
-      query: currentUrl,
-    },
-    { skipNull: true }
+      {
+        url: window.location.pathname,
+        query: currentUrl,
+      },
+      { skipNull: true }
   );
 }
 
@@ -168,30 +168,30 @@ export function getAccountTypeColors(type: AccountTypes) {
 }
 
 export function countTransactionCategories(
-  transactions: Transaction[]
+    transactions: Transaction[]
 ): CategoryCount[] {
   const categoryCounts: { [category: string]: number } = {};
   let totalCount = 0;
 
   transactions &&
-    transactions.forEach((transaction) => {
-      const category = transaction.category;
+  transactions.forEach((transaction) => {
+    const category = transaction.category;
 
-      if (categoryCounts.hasOwnProperty(category)) {
-        categoryCounts[category]++;
-      } else {
-        categoryCounts[category] = 1;
-      }
+    if (categoryCounts.hasOwnProperty(category)) {
+      categoryCounts[category]++;
+    } else {
+      categoryCounts[category] = 1;
+    }
 
-      totalCount++;
-    });
+    totalCount++;
+  });
 
   const aggregatedCategories: CategoryCount[] = Object.keys(categoryCounts).map(
-    (category) => ({
-      name: category,
-      count: categoryCounts[category],
-      totalCount,
-    })
+      (category) => ({
+        name: category,
+        count: categoryCounts[category],
+        totalCount,
+      })
   );
 
   aggregatedCategories.sort((a, b) => b.count - a.count);
@@ -214,12 +214,30 @@ export function decryptId(id: string) {
   return atob(id);
 }
 
+/**
+ * Get transaction/transfer status based on date
+ * Now returns status IDs from environment variables instead of hardcoded strings
+ */
+export const getTransactionStatusId = (date: Date): string => {
+  const today = new Date();
+  const twoDaysAgo = new Date(today);
+  twoDaysAgo.setDate(today.getDate() - 2);
+
+  // Return appropriate status ID based on date
+  return date > twoDaysAgo
+      ? process.env.NEXT_PUBLIC_APPWRITE_PENDING_STATUS_ID!
+      : process.env.NEXT_PUBLIC_APPWRITE_COMPLETED_STATUS_ID!;
+};
+
+/**
+ * Legacy function for backward compatibility - now returns string status names
+ */
 export const getTransactionStatus = (date: Date) => {
   const today = new Date();
   const twoDaysAgo = new Date(today);
   twoDaysAgo.setDate(today.getDate() - 2);
 
-  return date > twoDaysAgo ? "Processing" : "Success";
+  return date > twoDaysAgo ? "Pending" : "Completed";
 };
 
 export const authFormSchema = (type: string) => z.object({

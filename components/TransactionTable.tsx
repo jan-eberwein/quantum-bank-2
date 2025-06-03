@@ -35,7 +35,7 @@ const CategoryBadge = ({ categoryName }: CategoryBadgeProps) => {
 interface TransactionTableProps {
     transactions: Transaction[];
     categories: TransactionCategory[];
-    statuses: TransactionStatus[];
+    statuses: TransactionStatus[];  // Now using unified TransactionStatus
     dateFormat?: "short" | "long";
     showStatus?: boolean;
 }
@@ -105,7 +105,9 @@ const TransactionTable = ({
                                                 ? "bg-green-100 text-green-800"
                                                 : statusName === "Pending"
                                                     ? "bg-yellow-100 text-yellow-800"
-                                                    : "bg-gray-100 text-gray-800"
+                                                    : statusName === "Rejected"
+                                                        ? "bg-red-100 text-red-800"
+                                                        : "bg-gray-100 text-gray-800"
                                         }`}
                                     >
                                         {statusName}

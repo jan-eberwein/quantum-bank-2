@@ -15,9 +15,10 @@ export interface TransferResult {
 }
 
 export class TransferService {
-    // Get transfer status IDs (you'll need to add these to your .env.local)
+    // Use the unified status IDs from .env.local
     private static readonly PENDING_STATUS_ID = process.env.NEXT_PUBLIC_APPWRITE_PENDING_STATUS_ID!;
     private static readonly COMPLETED_STATUS_ID = process.env.NEXT_PUBLIC_APPWRITE_COMPLETED_STATUS_ID!;
+    private static readonly REJECTED_STATUS_ID = process.env.NEXT_PUBLIC_APPWRITE_REJECTED_STATUS_ID!;
 
     static async executeTransfer(transferData: TransferData): Promise<TransferResult> {
         try {
@@ -52,7 +53,7 @@ export class TransferService {
                 };
             }
 
-            // 4. Create transfer record
+            // 4. Create transfer record with unified status
             const transfer = await database.createDocument(
                 process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
                 process.env.NEXT_PUBLIC_APPWRITE_TRANSFERS_COLLECTION_ID!,
@@ -63,7 +64,7 @@ export class TransferService {
                     amount: transferData.amount,
                     description: transferData.description.slice(0, 200), // Limit description length
                     createdAt: new Date().toISOString(),
-                    transferStatusId: this.PENDING_STATUS_ID
+                    transferStatusId: this.PENDING_STATUS_ID // Using unified status
                 }
             );
 
@@ -85,14 +86,14 @@ export class TransferService {
                 )
             ]);
 
-            // 6. Create transaction records for both users
+            // 6. Create transaction records for both users using unified status
             const senderTransaction = {
                 userId: transferData.senderUserId,
                 amount: -transferData.amount, // Negative for outgoing
                 createdAt: new Date().toISOString(),
                 merchant: `Transfer to ${receiver.userId}`,
                 description: transferData.description || 'Money Transfer',
-                transactionStatusId: this.COMPLETED_STATUS_ID,
+                transactionStatusId: this.COMPLETED_STATUS_ID, // Using unified status
                 transactionCategoryId: process.env.NEXT_PUBLIC_APPWRITE_TRANSFER_CATEGORY_ID!
             };
 
@@ -102,7 +103,7 @@ export class TransferService {
                 createdAt: new Date().toISOString(),
                 merchant: `Transfer from ${sender.userId}`,
                 description: transferData.description || 'Money Received',
-                transactionStatusId: this.COMPLETED_STATUS_ID,
+                transactionStatusId: this.COMPLETED_STATUS_ID, // Using unified status
                 transactionCategoryId: process.env.NEXT_PUBLIC_APPWRITE_TRANSFER_CATEGORY_ID!
             };
 
@@ -121,7 +122,7 @@ export class TransferService {
                 )
             ]);
 
-            // 7. Update transfer status to completed
+            // 7. Update transfer status to completed using unified status
             await database.updateDocument(
                 process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
                 process.env.NEXT_PUBLIC_APPWRITE_TRANSFERS_COLLECTION_ID!,
