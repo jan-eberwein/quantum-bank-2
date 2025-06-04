@@ -7,6 +7,9 @@ import { useUser } from "@/context/UserContext";
 import { useAllUsers } from "@/hooks/useAllUsers";
 import { TransferService, TransferData } from "@/lib/transfer";
 import { formatEuroCents } from "@/lib/format";
+import React, { useState } from "react";
+import { CheckCircle2, Loader2 } from "lucide-react";
+import TransferConfirmationComponent from "@/components/TransferConfirmationComponent";
 
 export function useCustomVoiceActions() {
   const router = useRouter();
@@ -92,7 +95,7 @@ export function useCustomVoiceActions() {
     },
   });
 
-  // NEW: Send money action
+  // Send money action - Direct transfer
   useCopilotAction({
     name: "sendMoney",
     description: "Send money to another user",
@@ -164,7 +167,102 @@ export function useCustomVoiceActions() {
     },
   });
 
-  // NEW: Check balance action
+  // Send money action with confirmation widget
+  useCopilotAction({
+    name: "sendMoneyWithConfirmation",
+    description: "Send money to another user with in-chat confirmation",
+    parameters: [
+      {
+        name: "recipientName",
+        type: "string",
+        description: "The username or email of the recipient",
+        required: true,
+      },
+      {
+        name: "amount",
+        type: "number",
+        description: "The amount to send in euros",
+        required: true,
+      },
+      {
+        name: "description",
+        type: "string",
+        description: "Optional description for the transfer",
+        required: false,
+      },
+      {
+        name: "useWidget",
+        type: "boolean",
+        description: "Whether to use the confirmation widget",
+        required: false,
+      },
+    ],
+    render: ({ recipientName, amount, description, useWidget = false }) => {
+      if (!useWidget) return null;
+
+      // Find recipient
+      const recipient = users.find(
+          u => u.userId.toLowerCase() === recipientName.toLowerCase() ||
+              u.email.toLowerCase() === recipientName.toLowerCase()
+      );
+
+      if (!recipient) {
+        return (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-red-700">Could not find user "{recipientName}".</p>
+              <p className="text-sm text-gray-600 mt-1">
+                Available users: {users.filter(u => u.$id !== user?.$id).map(u => u.userId).join(", ")}
+              </p>
+            </div>
+        );
+      }
+
+      // Validate amount
+      const amountInCents = Math.round(amount * 100);
+      if (amountInCents <= 0) {
+        return (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-red-700">Amount must be greater than zero.</p>
+            </div>
+        );
+      }
+
+      return (
+          <TransferConfirmationComponent
+              recipientName={recipient.userId}
+              recipientEmail={recipient.email}
+              amount={amount}
+              description={description}
+              senderBalance={user?.balance || 0}
+              onConfirm={async () => {
+                if (!user) {
+                  throw new Error("User not logged in");
+                }
+
+                const transferData: TransferData = {
+                  senderUserId: user.$id,
+                  receiverUserId: recipient.$id,
+                  amount: amountInCents,
+                  description: description || `Transfer to ${recipient.userId}`
+                };
+
+                const result = await TransferService.executeTransfer(transferData);
+
+                if (result.success) {
+                  await refreshUser(true);
+                } else {
+                  throw new Error(result.error || "Transfer failed");
+                }
+              }}
+              onDeny={() => {
+                // Demo cancellation
+              }}
+          />
+      );
+    },
+  });
+
+  // Check balance action
   useCopilotAction({
     name: "checkBalance",
     description: "Check your current account balance",
@@ -177,7 +275,7 @@ export function useCustomVoiceActions() {
     },
   });
 
-  // NEW: View recent transfers action
+  // View recent transfers action
   useCopilotAction({
     name: "viewRecentTransfers",
     description: "Navigate to the transactions page to view recent transfers",
@@ -206,7 +304,7 @@ export function useCustomVoiceActions() {
     },
   });
 
-  // NEW: Request money action (placeholder)
+  // Request money action (placeholder)
   useCopilotAction({
     name: "requestMoney",
     description: "Request money from another user (creates a notification for them)",
@@ -237,31 +335,36 @@ export function useCustomVoiceActions() {
     },
   });
 
-  // NEW: Get transfer suggestions action
+  // Demo transfer action
   useCopilotAction({
-    name: "getTransferSuggestions",
-    description: "Get suggestions for common transfer amounts or recipients",
-    parameters: [],
-    handler: async () => {
-      if (!user) {
-        return "You must be logged in to get transfer suggestions.";
-      }
-
-      // In a real app, this could analyze transaction history
-      // For now, we'll return some generic suggestions
-      const availableRecipients = users
-          .filter(u => u.$id !== user.$id)
-          .slice(0, 3)
-          .map(u => u.userId);
-
-      return `Common transfer suggestions:
-- Send €50 to split a dinner bill
-- Send €20 for shared transportation
-- Send €100 for monthly shared expenses
-
-Available recipients: ${availableRecipients.join(", ")}
-
-Your current balance: €${user.balance / 100}`;
+    name: "createDemoTransfer",
+    description: "Create a demo transfer (for testing purposes)",
+    parameters: [
+      {
+        name: "amount",
+        type: "number",
+        description: "Demo amount in euros",
+        required: true,
+      },
+    ],
+    render: ({ amount }) => {
+      return (
+          <TransferConfirmationComponent
+              recipientName="Demo User"
+              recipientEmail="demo@example.com"
+              amount={amount}
+              description="Demo transfer for testing"
+              senderBalance={user?.balance || 100000}
+              onConfirm={async () => {
+                // Simulate processing delay
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                // Simulate success
+              }}
+              onDeny={() => {
+                // Demo cancellation
+              }}
+          />
+      );
     },
   });
 }

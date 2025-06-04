@@ -123,7 +123,7 @@ const SimpleMoneyTransfer: React.FC = () => {
                 <h2 className="text-lg font-bold text-black">Send Money</h2>
             </div>
 
-            {state.error && (
+            {state.error && state.step === 'input' && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md flex items-center gap-2">
                     <AlertCircle className="h-4 w-4 text-red-500" />
                     <span className="text-red-700 text-sm">{state.error}</span>
