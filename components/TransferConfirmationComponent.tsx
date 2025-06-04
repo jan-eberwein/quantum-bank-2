@@ -38,6 +38,17 @@ const TransferConfirmationComponent: React.FC<TransferConfirmationProps> = ({
         onDeny();
     };
 
+    // Format numbers to always show 2 decimal places
+    const formatAmount = (value: number | undefined | null) => {
+        if (typeof value !== 'number' || isNaN(value)) return '0.00';
+        return value.toFixed(2);
+    };
+
+    const formatBalance = (valueInCents: number | undefined | null) => {
+        if (typeof valueInCents !== 'number' || isNaN(valueInCents)) return '0.00';
+        return (valueInCents / 100).toFixed(2);
+    };
+
     const remainingBalance = senderBalance - (amount * 100);
     const isInsufficientFunds = remainingBalance < 0;
 
@@ -48,7 +59,7 @@ const TransferConfirmationComponent: React.FC<TransferConfirmationProps> = ({
                     <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-3" />
                     <h3 className="text-lg font-semibold text-gray-900 mb-1">Processing Transfer</h3>
                     <p className="text-sm text-gray-600 text-center">
-                        Securely processing your €{amount} transfer to {recipientName}...
+                        Securely processing your €{formatAmount(amount)} transfer to {recipientName}...
                     </p>
                 </div>
             </div>
@@ -62,10 +73,10 @@ const TransferConfirmationComponent: React.FC<TransferConfirmationProps> = ({
                     <CheckCircle2 className="h-12 w-12 text-green-500 mb-3" />
                     <h3 className="text-lg font-semibold text-green-700 mb-1">Transfer Successful!</h3>
                     <p className="text-sm text-gray-600 text-center mb-2">
-                        €{amount} has been sent to {recipientName}
+                        €{formatAmount(amount)} has been sent to {recipientName}
                     </p>
                     <div className="text-xs text-gray-500 bg-gray-50 rounded-md px-3 py-2 mt-2">
-                        New balance: €{remainingBalance / 100}
+                        New balance: €{formatBalance(remainingBalance)}
                     </div>
                 </div>
             </div>
@@ -100,7 +111,7 @@ const TransferConfirmationComponent: React.FC<TransferConfirmationProps> = ({
 
             {/* Amount Display */}
             <div className="text-center mb-6">
-                <div className="text-3xl font-bold text-gray-900 mb-1">€{amount}</div>
+                <div className="text-3xl font-bold text-gray-900 mb-1">€{formatAmount(amount)}</div>
                 <div className="text-sm text-gray-500">Transfer Amount</div>
             </div>
 
@@ -138,12 +149,12 @@ const TransferConfirmationComponent: React.FC<TransferConfirmationProps> = ({
                 </div>
                 <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Current balance:</span>
-                    <span className="font-medium text-gray-900">€{senderBalance / 100}</span>
+                    <span className="font-medium text-gray-900">€{formatBalance(senderBalance)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                     <span className="text-gray-600">After transfer:</span>
                     <span className={`font-medium ${isInsufficientFunds ? 'text-red-600' : 'text-gray-900'}`}>
-            €{remainingBalance / 100}
+            €{formatBalance(remainingBalance)}
           </span>
                 </div>
             </div>

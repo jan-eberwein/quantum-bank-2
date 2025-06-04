@@ -15,6 +15,12 @@ export function useQuantumBankActions() {
     const { user, refreshUser } = useUser();
     const { users } = useAllUsers();
 
+    // Format amount to always show 2 decimal places
+    const formatAmount = (value: number | undefined | null) => {
+        if (typeof value !== 'number' || isNaN(value)) return '0.00';
+        return value.toFixed(2);
+    };
+
     // Make user data readable by Copilot
     useCopilotReadable({
         description: "Current user balance and available transfer recipients",
@@ -23,7 +29,7 @@ export function useQuantumBankActions() {
                 id: user.$id,
                 name: user.userId,
                 email: user.email,
-                balance: user.balance / 100,
+                balance: formatAmount(user.balance / 100),
                 formattedBalance: formatEuroCents(user.balance)
             } : null,
             availableRecipients: users
@@ -37,13 +43,13 @@ export function useQuantumBankActions() {
     });
 
     // ===============================
-    // TRANSFER ACTIONS
+    // SECURE TRANSFER ACTIONS (CONFIRMATION MANDATORY)
     // ===============================
 
-    // Main transfer action with in-chat confirmation
+    // ONLY transfer action - always uses in-chat confirmation
     useCopilotAction({
         name: "sendMoneyInChat",
-        description: "Send money with an in-chat confirmation widget (recommended)",
+        description: "Send money with mandatory in-chat confirmation widget (ONLY method for transfers)",
         parameters: [
             {
                 name: "recipientName",
@@ -54,7 +60,7 @@ export function useQuantumBankActions() {
             {
                 name: "amount",
                 type: "number",
-                description: "The amount to send in euros (must be positive)",
+                description: "The amount to send in euros (will be formatted to 2 decimal places)",
                 required: true,
             },
             {
@@ -69,15 +75,24 @@ export function useQuantumBankActions() {
                 return "❌ You must be logged in to send money.";
             }
 
-            // Find recipient
+            // Validate input parameters
+            if (!recipientName || typeof recipientName !== 'string') {
+                return "❌ Please provide a valid recipient name or email.";
+            }
+
+            if (!amount || typeof amount !== 'number') {
+                return "❌ Please provide a valid amount.";
+            }
+
+            // Find recipient with safe string operations
             const recipient = users.find(
-                u => u.userId.toLowerCase() === recipientName.toLowerCase() ||
-                    u.email.toLowerCase() === recipientName.toLowerCase()
+                u => u.userId?.toLowerCase() === recipientName.toLowerCase() ||
+                    u.email?.toLowerCase() === recipientName.toLowerCase()
             );
 
             if (!recipient) {
                 const availableUsers = users
-                    .filter(u => u.$id !== user.$id)
+                    .filter(u => u.$id !== user.$id && u.userId)
                     .map(u => u.userId)
                     .slice(0, 5);
 
@@ -89,7 +104,7 @@ export function useQuantumBankActions() {
                 return "❌ Amount must be greater than zero.";
             }
 
-            return `Setting up transfer confirmation for €${amount} to ${recipient.userId}...`;
+            return `🔒 Setting up secure transfer confirmation for €${formatAmount(amount)} to ${recipient.userId}...`;
         },
         render: ({ status, args }) => {
             if (!user || !args) return <div>Loading...</div>;
@@ -97,8 +112,108 @@ export function useQuantumBankActions() {
             const { recipientName, amount, description } = args;
 
             const recipient = users.find(
-                u => u.userId.toLowerCase() === recipientName.toLowerCase() ||
-                    u.email.toLowerCase() === recipientName.toLowerCase()
+                u => u.userId?.toLowerCase() === recipientName?.toLowerCase() ||
+                    u.email?.toLowerCase() === recipientName?.toLowerCase()
+            );
+
+            if (!recipient) {
+                return (
+                    <div className="p-4 border rounded-lg bg-red-50 border-red-200">
+                        <p className="text-red-700">❌ Recipient "{recipientName}" not found.</p>
+                        <p className="text-sm text-gray-600 mt-1">
+                            Available users: {users.filter(u => u.$id !== user?.$id && u.userId).map(u => u.userId).join(", ")}
+                        </p>
+                    </div>
+                );
+            }
+
+            return (
+                <TransferConfirmationComponent
+                    recipientName={recipient.userId}
+                    recipientEmail={recipient.email}
+                    amount={amount}
+                    description={description}
+                    senderBalance={user.balance}
+                    onConfirm={async () => {
+                        const amountInCents = Math.round(amount * 100);
+
+                        if (user.balance < amountInCents) {
+                            throw new Error("Insufficient funds");
+                        }
+
+                        const transferData: TransferData = {
+                            senderUserId: user.$id,
+                            receiverUserId: recipient.$id,
+                            amount: amountInCents,
+                            description: description || `Transfer to ${recipient.userId}`
+                        };
+
+                        const result = await TransferService.executeTransfer(transferData);
+
+                        if (!result.success) {
+                            throw new Error(result.error || 'Transfer failed');
+                        }
+
+                        await refreshUser(true);
+                    }}
+                    onDeny={() => {
+                        // Cancellation handled by component
+                    }}
+                />
+            );
+        },
+    });
+
+    // Redirect any direct transfer attempts to secure confirmation
+    useCopilotAction({
+        name: "sendMoneyDirect",
+        description: "DEPRECATED: Redirects to secure confirmation - all transfers require confirmation",
+        parameters: [
+            {
+                name: "recipientName",
+                type: "string",
+                description: "The username or email of the recipient",
+                required: true,
+            },
+            {
+                name: "amount",
+                type: "number",
+                description: "The amount to send in euros",
+                required: true,
+            },
+            {
+                name: "description",
+                type: "string",
+                description: "Optional description for the transfer",
+                required: false,
+            },
+        ],
+        handler: async ({ recipientName, amount, description }) => {
+            // Validate input parameters
+            if (!recipientName || typeof recipientName !== 'string') {
+                return "❌ Please provide a valid recipient name or email.";
+            }
+
+            if (!amount || typeof amount !== 'number') {
+                return "❌ Please provide a valid amount.";
+            }
+
+            return `🔒 For your security and financial protection, all transfers require confirmation. I'll show you the secure confirmation widget where you can review all details before proceeding.
+
+Amount: €${formatAmount(amount)}
+Recipient: ${recipientName}
+${description ? `Description: ${description}` : ''}
+
+The confirmation widget will appear below this message.`;
+        },
+        render: ({ status, args }) => {
+            if (!user || !args) return <div>Loading...</div>;
+
+            const { recipientName, amount, description } = args;
+
+            const recipient = users.find(
+                u => u.userId?.toLowerCase() === recipientName?.toLowerCase() ||
+                    u.email?.toLowerCase() === recipientName?.toLowerCase()
             );
 
             if (!recipient) {
@@ -146,74 +261,6 @@ export function useQuantumBankActions() {
         },
     });
 
-    // Direct transfer without confirmation widget
-    useCopilotAction({
-        name: "sendMoneyDirect",
-        description: "Send money directly without confirmation widget",
-        parameters: [
-            {
-                name: "recipientName",
-                type: "string",
-                description: "The username or email of the recipient",
-                required: true,
-            },
-            {
-                name: "amount",
-                type: "number",
-                description: "The amount to send in euros",
-                required: true,
-            },
-            {
-                name: "description",
-                type: "string",
-                description: "Optional description for the transfer",
-                required: false,
-            },
-        ],
-        handler: async ({ recipientName, amount, description }) => {
-            if (!user) {
-                return "You must be logged in to send money.";
-            }
-
-            const recipient = users.find(
-                u => u.userId.toLowerCase() === recipientName.toLowerCase() ||
-                    u.email.toLowerCase() === recipientName.toLowerCase()
-            );
-
-            if (!recipient) {
-                return `Could not find user "${recipientName}". Available users are: ${users
-                    .filter(u => u.$id !== user.$id)
-                    .map(u => u.userId)
-                    .join(", ")}`;
-            }
-
-            const amountInCents = Math.round(amount * 100);
-            if (amountInCents <= 0) {
-                return "Amount must be greater than zero.";
-            }
-
-            if (user.balance < amountInCents) {
-                return `Insufficient balance. You have €${user.balance / 100}, but trying to send €${amount}.`;
-            }
-
-            const transferData: TransferData = {
-                senderUserId: user.$id,
-                receiverUserId: recipient.$id,
-                amount: amountInCents,
-                description: description || `Transfer to ${recipient.userId}`
-            };
-
-            const result = await TransferService.executeTransfer(transferData);
-
-            if (result.success) {
-                await refreshUser(true);
-                return `Successfully sent €${amount} to ${recipient.userId}. Your new balance is €${(user.balance - amountInCents) / 100}.`;
-            } else {
-                return `Transfer failed: ${result.error}`;
-            }
-        },
-    });
-
     // ===============================
     // ACCOUNT ACTIONS
     // ===============================
@@ -226,7 +273,7 @@ export function useQuantumBankActions() {
             if (!user) {
                 return "❌ You must be logged in to check your balance.";
             }
-            return `💰 Your current balance is €${user.balance / 100}`;
+            return `💰 Your current balance is €${formatAmount(user.balance / 100)}`;
         },
     });
 
@@ -248,7 +295,7 @@ export function useQuantumBankActions() {
                 return "📭 No other users available for transfers.";
             }
 
-            return `👥 **Available Recipients:**\n\n${availableUsers.join('\n')}\n\nTo send money, say: "Send €50 to [username]"`;
+            return `👥 **Available Recipients:**\n\n${availableUsers.join('\n')}\n\n🔒 To send money securely, say: "Send €${formatAmount(50)} to [username]"`;
         },
     });
 
@@ -272,19 +319,19 @@ export function useQuantumBankActions() {
                 case "transactions":
                 case "transaktionen":
                     router.push("/transactions");
-                    return "Navigating to transactions page...";
+                    return "🧭 Navigating to transactions page...";
                 case "settings":
                 case "einstellungen":
                     router.push("/settings");
-                    return "Navigating to settings page...";
+                    return "🧭 Navigating to settings page...";
                 case "dashboard":
                 case "start":
                 case "home":
                 case "übersicht":
                     router.push("/");
-                    return "Navigating to dashboard...";
+                    return "🧭 Navigating to dashboard...";
                 default:
-                    return `Unknown page: ${page}. Available pages: transactions, settings, dashboard`;
+                    return `❌ Unknown page: ${page}. Available pages: transactions, settings, dashboard`;
             }
         },
     });
@@ -313,7 +360,7 @@ export function useQuantumBankActions() {
             const url = queryString ? `/transactions?${queryString}` : "/transactions";
 
             router.push(url);
-            return `Navigating to transactions page${filterType ? ` (showing ${filterType} transfers)` : ""}...`;
+            return `🧭 Navigating to transactions page${filterType ? ` (showing ${filterType} transfers)` : ""}...`;
         },
     });
 
@@ -343,7 +390,7 @@ export function useQuantumBankActions() {
                 detail: { setting, value },
             });
             window.dispatchEvent(event);
-            return `Setting ${setting} has been ${value ? 'enabled' : 'disabled'}.`;
+            return `⚙️ Setting ${setting} has been ${value ? 'enabled' : 'disabled'}.`;
         },
     });
 }
