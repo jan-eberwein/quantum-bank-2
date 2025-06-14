@@ -1,16 +1,49 @@
 "use client";
-import { BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Bar } from "recharts";
+
 import React from "react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import { formatEuroCents } from "@/lib/format";
 
-const BarChartClient = ({ data }: { data: any[] }) => (
-  <BarChart width={300} height={300} data={data}>
-    <CartesianGrid strokeDasharray="3 3" />
-    <XAxis dataKey="month" />
-    <YAxis />
-    <Tooltip />
-    <Legend />
-    <Bar dataKey="amount" fill="#fa325a" />
-  </BarChart>
-);
+interface BarChartClientProps {
+  data: { month: string; amount: number }[];
+}
 
-export default BarChartClient;
+export default function BarChartClient({ data }: BarChartClientProps) {
+  return (
+    <ResponsiveContainer width="100%" height={250}>
+      <BarChart
+        data={data}
+        margin={{ top: 20, right: 20, left: 0, bottom: 5 }}
+      >
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis dataKey="month" />
+        <YAxis
+          tickFormatter={(value) =>
+            formatEuroCents(Math.round(value * 100))
+          }
+        />
+        <Tooltip
+          formatter={(value: number) =>
+            formatEuroCents(Math.round(value * 100))
+          }
+        />
+        <Legend verticalAlign="top" height={36} />
+        <Bar
+          dataKey="amount"
+          name="Expenses"
+          fill="#EF4444"
+          barSize={40}
+        />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}

@@ -1,27 +1,53 @@
 "use client";
-import { PieChart, Pie, Tooltip, Legend, Cell } from "recharts";
+
 import React from "react";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import { formatEuroCents } from "@/lib/format";
 
-const colors = ["#8884d8", "#82ca9d", "#ffc658", "#ff8042"];
+interface PieChartClientProps {
+  data: { category: string; amount: number }[];
+}
 
-const PieChartClient = ({ data }: { data: any[] }) => (
-  <PieChart width={300} height={300}>
-    <Pie
-      data={data}
-      dataKey="amount"
-      nameKey="category"
-      cx="50%"
-      cy="50%"
-      outerRadius={80}
-      fill="#8884d8"
-    >
-      {data.map((entry, index) => (
-        <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
-      ))}
-    </Pie>
-    <Tooltip />
-    <Legend />
-  </PieChart>
-);
+const COLORS = [
+  "#4F46E5",
+  "#3B82F6",
+  "#10B981",
+  "#F59E0B",
+  "#EF4444",
+  "#8B5CF6",
+];
 
-export default PieChartClient;
+export default function PieChartClient({ data }: PieChartClientProps) {
+  return (
+    <ResponsiveContainer width="100%" height={250}>
+      <PieChart>
+        <Pie
+          data={data}
+          dataKey="amount"
+          nameKey="category"
+          cx="50%"
+          cy="50%"
+          outerRadius={80}
+          label={({ percent }) => `${(percent! * 100).toFixed(0)}%`}
+        >
+          {data.map((_, i) => (
+            <Cell key={i} fill={COLORS[i % COLORS.length]} />
+          ))}
+        </Pie>
+        <Tooltip
+          formatter={(value: number) =>
+            formatEuroCents(Math.round(value * 100))
+          }
+        />
+        <Legend verticalAlign="bottom" height={36} />
+      </PieChart>
+    </ResponsiveContainer>
+  );
+}

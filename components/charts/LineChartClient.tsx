@@ -1,17 +1,59 @@
 "use client";
-import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend } from "recharts";
+
 import React from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import { formatEuroCents } from "@/lib/format";
 
-const LineChartClient = ({ data }: { data: any[] }) => (
-  <LineChart width={300} height={300} data={data}>
-    <CartesianGrid strokeDasharray="3 3" />
-    <XAxis dataKey="month" />
-    <YAxis />
-    <Tooltip />
-    <Legend />
-    <Line type="monotone" dataKey="income" stroke="#82ca9d" />
-    <Line type="monotone" dataKey="expenses" stroke="#fa325a" />
-  </LineChart>
-);
+interface LineChartClientProps {
+  data: { month: string; income: number; expenses: number }[];
+}
 
-export default LineChartClient;
+export default function LineChartClient({ data }: LineChartClientProps) {
+  return (
+    <ResponsiveContainer width="100%" height={250}>
+      <LineChart
+        data={data}
+        margin={{ top: 20, right: 20, left: 0, bottom: 5 }}
+      >
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis dataKey="month" />
+        <YAxis
+          tickFormatter={(value) =>
+            formatEuroCents(Math.round(value * 100))
+          }
+        />
+        <Tooltip
+          formatter={(value: number) =>
+            formatEuroCents(Math.round(value * 100))
+          }
+        />
+        <Legend verticalAlign="top" height={36} />
+        <Line
+          type="monotone"
+          dataKey="income"
+          name="Income"
+          stroke="#10B981"
+          strokeWidth={2}
+          dot={{ r: 3 }}
+        />
+        <Line
+          type="monotone"
+          dataKey="expenses"
+          name="Expenses"
+          stroke="#EF4444"
+          strokeWidth={2}
+          dot={{ r: 3 }}
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
