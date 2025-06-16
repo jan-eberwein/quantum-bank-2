@@ -20,6 +20,7 @@ declare module "react-speech-recognition" {
     startListening(options?: SpeechRecognitionOptions): void;
     stopListening(): void;
     abortListening(): void;
+    getRecognition(): any;
   };
 
   export default SpeechRecognition;

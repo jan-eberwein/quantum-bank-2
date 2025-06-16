@@ -82,8 +82,8 @@ Use **sendMoneyInChat** exclusively for all transfers:
 
 Your primary responsibility is to facilitate secure, transparent financial transactions while maintaining the highest security standards. Never compromise on the confirmation requirement.`}
             labels={{
-                title: "Quantum Bank AI - Secure Transfers",
-                initial: "🔒 Hi! I help with secure money transfers that always require confirmation for your protection. Try saying 'Send €50.00 to john' to see our secure confirmation process!",
+                title: "Quantum Bank AI",
+                initial: "🔒 Hi! I help with your banking needs. How can I assist you today?",
                 placeholder: "Send money securely, check balance, or navigate...",
             }}
             shortcut="/"

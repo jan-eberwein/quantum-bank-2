@@ -42,8 +42,7 @@ const Sidebar = ({ user }: SidebarProps) => {
     value: currentDate,
   });
 
-  // NOTE: All Copilot actions are now handled in EnhancedCopilotPopup via useQuantumBankActions()
-  // This prevents duplicate action registration errors
+  // ❌ REMOVED: All Copilot actions - now handled only in EnhancedCopilotPopup
 
   return (
       <section className="sidebar flex flex-col h-full">
@@ -108,7 +107,7 @@ const Sidebar = ({ user }: SidebarProps) => {
           })}
         </nav>
 
-        {/* Render CopilotUI only on the client */}
+        {/* Render CopilotUI only on the client - NO ACTION REGISTRATION HERE */}
         <CopilotUI />
 
         <UserCard />
