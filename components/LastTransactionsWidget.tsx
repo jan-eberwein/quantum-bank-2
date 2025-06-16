@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import useUser from '@/hooks/useUser';
 import useTransactionCategories from '@/hooks/useTransactionCategories';
@@ -14,7 +14,7 @@ interface LastTransactionsWidgetProps {
     refreshKey?: number;
 }
 
-const LastTransactionsWidget = ({ refreshKey = 0 }: LastTransactionsWidgetProps) => {
+const LastTransactionsWidget = React.memo(({ refreshKey = 0 }: LastTransactionsWidgetProps) => {
     const router = useRouter();
     const { user } = useUser();
     const { categories, loading: categoriesLoading } = useTransactionCategories();
@@ -23,57 +23,62 @@ const LastTransactionsWidget = ({ refreshKey = 0 }: LastTransactionsWidgetProps)
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [transactionsLoading, setTransactionsLoading] = useState(true);
 
+    // Memoized fetch function to prevent unnecessary re-creations
+    const fetchTransactions = useCallback(async () => {
+        if (!user?.$id) {
+            setTransactions([]);
+            setTransactionsLoading(false);
+            return;
+        }
+
+        // Only show loading on initial load, not on refresh
+        if (transactions.length === 0) {
+            setTransactionsLoading(true);
+        }
+
+        try {
+            const res = await database.listDocuments(
+                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+                process.env.NEXT_PUBLIC_APPWRITE_TRANSACTIONS_COLLECTION_ID!,
+                [
+                    Query.equal('userId', user.$id),
+                    Query.orderDesc('createdAt'),
+                    Query.limit(1000)
+                ]
+            );
+
+            const mapped: Transaction[] = res.documents
+                .map((doc: any) => ({
+                    $id: doc.$id,
+                    userId: doc.userId,
+                    amount: doc.amount,
+                    createdAt: doc.createdAt,
+                    merchant: doc.merchant,
+                    description: doc.description || '',
+                    transactionStatusId: doc.transactionStatusId,
+                    transactionCategoryId: doc.transactionCategoryId,
+                    $createdAt: doc.$createdAt,
+                    $updatedAt: doc.$updatedAt,
+                }))
+                .filter(isTransaction);
+
+            setTransactions(mapped);
+        } catch (err) {
+            console.error('Error fetching transactions:', err);
+        } finally {
+            setTransactionsLoading(false);
+        }
+    }, [user?.$id, transactions.length]);
+
     // Fetch transactions with refresh trigger
     useEffect(() => {
-        const fetchTransactions = async () => {
-            if (!user?.$id) {
-                setTransactions([]);
-                setTransactionsLoading(false);
-                return;
-            }
-
-            setTransactionsLoading(true);
-            try {
-                const res = await database.listDocuments(
-                    process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                    process.env.NEXT_PUBLIC_APPWRITE_TRANSACTIONS_COLLECTION_ID!,
-                    [
-                        Query.equal('userId', user.$id),
-                        Query.orderDesc('createdAt'),
-                        Query.limit(1000)
-                    ]
-                );
-
-                const mapped: Transaction[] = res.documents
-                    .map((doc: any) => ({
-                        $id: doc.$id,
-                        userId: doc.userId,
-                        amount: doc.amount,
-                        createdAt: doc.createdAt,
-                        merchant: doc.merchant,
-                        description: doc.description || '',
-                        transactionStatusId: doc.transactionStatusId,
-                        transactionCategoryId: doc.transactionCategoryId,
-                        $createdAt: doc.$createdAt,
-                        $updatedAt: doc.$updatedAt,
-                    }))
-                    .filter(isTransaction);
-
-                setTransactions(mapped);
-            } catch (err) {
-                console.error('Error fetching transactions:', err);
-            } finally {
-                setTransactionsLoading(false);
-            }
-        };
-
         fetchTransactions();
     }, [user?.$id, refreshKey]);
 
     // Check if we're still loading any required data
     const isLoading = transactionsLoading || categoriesLoading || statusesLoading;
 
-    // Get the 4 most recent transactions (reduced from 5)
+    // Get the 4 most recent transactions (reduced from 5) - memoized for performance
     const lastTransactions = React.useMemo(() => {
         if (!transactions.length) return [];
 
@@ -99,7 +104,7 @@ const LastTransactionsWidget = ({ refreshKey = 0 }: LastTransactionsWidgetProps)
         );
     }
 
-    // Show empty state if no transactions (matching the main transactions page style)
+    // Show empty state if no transactions
     if (!lastTransactions.length) {
         return (
             <div className="last-transactions-widget border p-4 rounded-lg shadow-md bg-white">
@@ -135,7 +140,6 @@ const LastTransactionsWidget = ({ refreshKey = 0 }: LastTransactionsWidgetProps)
                 </button>
             </div>
 
-            {/* Only render the table if we have all the required data */}
             {categories.length > 0 && statuses.length > 0 ? (
                 <TransactionTable
                     transactions={lastTransactions}
@@ -154,6 +158,6 @@ const LastTransactionsWidget = ({ refreshKey = 0 }: LastTransactionsWidgetProps)
             )}
         </div>
     );
-};
+});
 
 export default LastTransactionsWidget;

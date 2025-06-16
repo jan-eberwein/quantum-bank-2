@@ -16,7 +16,6 @@ const useTransactions = (userId: string | undefined, refreshKey: number = 0) => 
                 return;
             }
 
-            console.log("useTransactions: Fetching transactions for userId:", userId, "refreshKey:", refreshKey);
             setLoading(true);
             try {
                 const res = await database.listDocuments(
@@ -45,7 +44,6 @@ const useTransactions = (userId: string | undefined, refreshKey: number = 0) => 
                     }))
                     .filter(isTransaction); // Runtime type validation
 
-                console.log("useTransactions: Fetched", mapped.length, "transactions");
                 setTransactions(mapped);
             } catch (err: any) {
                 console.error('Error fetching transactions:', err);

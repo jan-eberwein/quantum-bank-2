@@ -26,12 +26,7 @@ const Home: React.FC = () => {
 
   // 🔁 Called after successful transfer to refresh both balance and transactions
   const handleTransferComplete = () => {
-    console.log("Dashboard: Transfer completed, refreshing data. Current refreshKey:", refreshKey);
-    setRefreshKey((prev) => {
-      const newKey = prev + 1;
-      console.log("Dashboard: Setting new refreshKey:", newKey);
-      return newKey;
-    });
+    setRefreshKey((prev) => prev + 1);
   };
 
   return (
@@ -47,10 +42,7 @@ const Home: React.FC = () => {
           {loading || balanceLoading || !user ? (
               <p>Loading…</p>
           ) : (
-              <>
-                <TotalBalanceBox balance={balance / 100} />
-                {console.log("Dashboard: Rendering TotalBalanceBox with balance:", balance / 100, "refreshKey:", refreshKey)}
-              </>
+              <TotalBalanceBox balance={balance / 100} />
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
