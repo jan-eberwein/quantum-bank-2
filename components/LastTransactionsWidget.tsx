@@ -1,30 +1,85 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import useUser from '@/hooks/useUser';
-import useTransactions from '@/hooks/useTransactions';
 import useTransactionCategories from '@/hooks/useTransactionCategories';
 import useTransactionStatuses from '@/hooks/useTransactionStatuses';
 import TransactionTable from '@/components/TransactionTable';
+import { database } from '@/lib/appwrite';
+import { Query } from 'appwrite';
+import { Transaction, isTransaction } from '@/types/Transaction';
 
-const LastTransactionsWidget = () => {
+interface LastTransactionsWidgetProps {
+    refreshKey?: number;
+}
+
+const LastTransactionsWidget = ({ refreshKey = 0 }: LastTransactionsWidgetProps) => {
     const router = useRouter();
     const { user } = useUser();
-    const { transactions, loading: transactionsLoading } = useTransactions(user?.$id);
     const { categories, loading: categoriesLoading } = useTransactionCategories();
     const { statuses, loading: statusesLoading } = useTransactionStatuses();
+
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [transactionsLoading, setTransactionsLoading] = useState(true);
+
+    // Fetch transactions with refresh trigger
+    useEffect(() => {
+        const fetchTransactions = async () => {
+            if (!user?.$id) {
+                setTransactions([]);
+                setTransactionsLoading(false);
+                return;
+            }
+
+            setTransactionsLoading(true);
+            try {
+                const res = await database.listDocuments(
+                    process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+                    process.env.NEXT_PUBLIC_APPWRITE_TRANSACTIONS_COLLECTION_ID!,
+                    [
+                        Query.equal('userId', user.$id),
+                        Query.orderDesc('createdAt'),
+                        Query.limit(1000)
+                    ]
+                );
+
+                const mapped: Transaction[] = res.documents
+                    .map((doc: any) => ({
+                        $id: doc.$id,
+                        userId: doc.userId,
+                        amount: doc.amount,
+                        createdAt: doc.createdAt,
+                        merchant: doc.merchant,
+                        description: doc.description || '',
+                        transactionStatusId: doc.transactionStatusId,
+                        transactionCategoryId: doc.transactionCategoryId,
+                        $createdAt: doc.$createdAt,
+                        $updatedAt: doc.$updatedAt,
+                    }))
+                    .filter(isTransaction);
+
+                setTransactions(mapped);
+            } catch (err) {
+                console.error('Error fetching transactions:', err);
+            } finally {
+                setTransactionsLoading(false);
+            }
+        };
+
+        fetchTransactions();
+    }, [user?.$id, refreshKey]);
 
     // Check if we're still loading any required data
     const isLoading = transactionsLoading || categoriesLoading || statusesLoading;
 
-    // Get the 5 most recent transactions
+    // Get the 4 most recent transactions (reduced from 5)
     const lastTransactions = React.useMemo(() => {
         if (!transactions.length) return [];
 
         return [...transactions]
             .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-            .slice(0, 5);
+            .slice(0, 4);
     }, [transactions]);
 
     // Show loading state

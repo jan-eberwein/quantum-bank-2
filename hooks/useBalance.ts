@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import useTransactions from "./useTransactions";
 
 /**
@@ -6,18 +6,14 @@ import useTransactions from "./useTransactions";
  * Triggers recalculation if `refreshKey` changes.
  */
 export default function useBalance(userId?: string, refreshKey: number = 0) {
-  const [internalKey, setInternalKey] = useState(0);
-
-  // Force re-fetch or re-evaluation if refreshKey changes
-  useEffect(() => {
-    setInternalKey(refreshKey);
-  }, [refreshKey]);
-
-  const { transactions, loading } = useTransactions(userId);
+  // Pass refreshKey to useTransactions to trigger refetch
+  const { transactions, loading } = useTransactions(userId, refreshKey);
 
   const balance = useMemo(() => {
+    console.log("useBalance: Recalculating balance with", transactions.length, "transactions, refreshKey:", refreshKey);
     return transactions.reduce((sum, tx) => sum + tx.amount, 0);
-  }, [transactions, internalKey]);
+  }, [transactions, refreshKey]);
 
+  console.log("useBalance: Current balance is", balance, "cents");
   return { balance, loading };
 }
