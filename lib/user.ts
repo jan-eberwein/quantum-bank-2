@@ -66,3 +66,15 @@ export async function updateUserPreferences(
         data
     );
 }
+
+export async function updateUserDocument(
+    documentId: string,
+    data: Partial<UserProfile>
+): Promise<void> {
+    await database.updateDocument(
+        DATABASE_ID,
+        USERS_COLLECTION_ID,
+        documentId,
+        data
+    );
+}
