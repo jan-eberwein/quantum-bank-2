@@ -5,16 +5,17 @@ import {
   RadialLinearScale,
   ArcElement,
   Tooltip,
-  Legend
+  Legend,
+  ChartOptions
 } from 'chart.js';
 import { PolarArea } from 'react-chartjs-2';
 
 // Register Chart.js components
 ChartJS.register(
-  RadialLinearScale,
-  ArcElement,
-  Tooltip,
-  Legend
+    RadialLinearScale,
+    ArcElement,
+    Tooltip,
+    Legend
 );
 
 const PolarAreaChart = () => {
@@ -37,7 +38,7 @@ const PolarAreaChart = () => {
     ]
   };
 
-  const options = {
+  const options: ChartOptions<'polarArea'> = {
     responsive: true,
     plugins: {
       legend: {
@@ -64,9 +65,9 @@ const PolarAreaChart = () => {
   };
 
   return (
-    <div style={{ height: '400px', width: '100%' }}>
-      <PolarArea data={data} options={options} />
-    </div>
+      <div style={{ height: '400px', width: '100%' }}>
+        <PolarArea data={data} options={options} />
+      </div>
   );
 }
 

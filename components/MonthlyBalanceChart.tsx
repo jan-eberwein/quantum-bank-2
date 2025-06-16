@@ -9,20 +9,22 @@ import {
   Title,
   Tooltip,
   Legend,
-  Filler, // Import Filler for area coloring
+  Filler,
+  Tick,
+  ChartOptions
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 
 // Register Chart.js components
 ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler // Register Filler for area filling
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    Title,
+    Tooltip,
+    Legend,
+    Filler
 );
 
 const MonthlyBalanceChart = () => {
@@ -39,7 +41,7 @@ const MonthlyBalanceChart = () => {
         label: 'Total Balance',
         data: totalBalance,
         borderColor: '#0747b6',
-        backgroundColor: 'rgba(7, 71, 182, 0.0)', // No fill
+        backgroundColor: 'rgba(7, 71, 182, 0.0)',
         tension: 0.3,
         borderWidth: 2,
         pointRadius: 4,
@@ -50,32 +52,32 @@ const MonthlyBalanceChart = () => {
         label: 'Income',
         data: income,
         borderColor: 'green',
-        backgroundColor: 'rgba(0, 255, 0, 0.2)', // Light green fill
+        backgroundColor: 'rgba(0, 255, 0, 0.2)',
         tension: 0.3,
         borderWidth: 2,
         pointRadius: 4,
         pointBackgroundColor: 'green',
-        fill: true // Ensure fill is enabled
+        fill: true
       },
       {
         label: 'Expenses',
         data: expenses,
         borderColor: 'red',
-        backgroundColor: 'rgba(255, 0, 0, 0.2)', // Light red fill
+        backgroundColor: 'rgba(255, 0, 0, 0.2)',
         tension: 0.3,
         borderWidth: 2,
         pointRadius: 4,
         pointBackgroundColor: 'red',
-        fill: true // Ensure fill is enabled
+        fill: true
       }
     ]
   };
 
-  const options = {
+  const options: ChartOptions<'line'> = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { 
+      legend: {
         position: 'top',
         labels: {
           usePointStyle: true,
@@ -97,7 +99,7 @@ const MonthlyBalanceChart = () => {
       y: {
         beginAtZero: false,
         ticks: {
-          callback: function(value) {
+          callback: function (value: string | number | Tick) {
             return '$' + Number(value).toLocaleString();
           }
         }
@@ -111,9 +113,9 @@ const MonthlyBalanceChart = () => {
   };
 
   return (
-    <div style={{ height: '400px', width: '100%' }}>
-      <Line data={data} options={options} />
-    </div>
+      <div style={{ height: '400px', width: '100%' }}>
+        <Line data={data} options={options} />
+      </div>
   );
 }
 
