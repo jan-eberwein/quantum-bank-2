@@ -35,6 +35,24 @@ const TransferConfirmationComponent: React.FC<TransferConfirmationProps> = ({
             setActualNewBalance(newBalance);
 
             setStatus('success');
+
+            // 🔄 Emit custom event to trigger dashboard refresh
+            const transferCompleteEvent = new CustomEvent('copilot-transfer-complete', {
+                detail: {
+                    amount: amount,
+                    recipient: recipientName,
+                    newBalance: newBalance,
+                    timestamp: new Date().toISOString()
+                }
+            });
+            window.dispatchEvent(transferCompleteEvent);
+
+            console.log('✅ Copilot transfer complete event emitted', {
+                amount,
+                recipient: recipientName,
+                newBalance: newBalance / 100
+            });
+
         } catch (error: any) {
             setStatus('error');
             setErrorMessage(error.message || 'Transfer failed');

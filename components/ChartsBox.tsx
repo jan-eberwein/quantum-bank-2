@@ -14,9 +14,13 @@ const PieChartClient = dynamic(() => import("./charts/PieChartClient"), { ssr: f
 const BarChartClient = dynamic(() => import("./charts/BarChartClient"), { ssr: false });
 const LineChartClient = dynamic(() => import("./charts/LineChartClient"), { ssr: false });
 
-const ChartsBox: React.FC = () => {
+interface ChartsBoxProps {
+  refreshKey?: number;
+}
+
+const ChartsBox: React.FC<ChartsBoxProps> = ({ refreshKey = 0 }) => {
   const { user } = useUser();
-  const { transactions } = useTransactions(user?.$id);
+  const { transactions } = useTransactions(user?.$id, refreshKey); // Pass refreshKey to trigger updates
   const { categories } = useTransactionCategories();
 
   // 1) Spending by category (in €)
@@ -26,13 +30,13 @@ const ChartsBox: React.FC = () => {
       if (t.amount < 0) {
         const euros = Math.abs(t.amount) / 100;
         const name =
-          categories.find((c) => c.$id === t.transactionCategoryId)?.name ||
-          "Uncategorized";
+            categories.find((c) => c.$id === t.transactionCategoryId)?.name ||
+            "Uncategorized";
         totals.set(name, (totals.get(name) || 0) + euros);
       }
     });
     return Array.from(totals, ([category, amount]) => ({ category, amount }));
-  }, [transactions, categories]);
+  }, [transactions, categories, refreshKey]); // Add refreshKey to dependencies
 
   // 2) Monthly spending (sum of expenses per month, in €), sorted Jan→Dec
   const barData = useMemo(() => {
@@ -49,8 +53,8 @@ const ChartsBox: React.FC = () => {
       "Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"
     ];
     return Array.from(totals, ([month, amount]) => ({ month, amount }))
-      .sort((a, b) => monthsOrder.indexOf(a.month) - monthsOrder.indexOf(b.month));
-  }, [transactions]);
+        .sort((a, b) => monthsOrder.indexOf(a.month) - monthsOrder.indexOf(b.month));
+  }, [transactions, refreshKey]); // Add refreshKey to dependencies
 
   // 3) Income vs. expenses per month (in €), sorted Jan→Dec
   const lineData = useMemo(() => {
@@ -70,25 +74,25 @@ const ChartsBox: React.FC = () => {
       income,
       expenses,
     })).sort((a, b) => monthsOrder.indexOf(a.month) - monthsOrder.indexOf(b.month));
-  }, [transactions]);
+  }, [transactions, refreshKey]); // Add refreshKey to dependencies
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-      <div className="bg-white p-4 rounded-lg shadow">
-        <h3 className="text-lg font-semibold mb-3">Spending by Categories</h3>
-        <PieChartClient data={pieData} />
-      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-3">Spending by Categories</h3>
+          <PieChartClient data={pieData} />
+        </div>
 
-      <div className="bg-white p-4 rounded-lg shadow">
-        <h3 className="text-lg font-semibold mb-3">Monthly Spending</h3>
-        <BarChartClient data={barData} />
-      </div>
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-3">Monthly Spending</h3>
+          <BarChartClient data={barData} />
+        </div>
 
-      <div className="bg-white p-4 rounded-lg shadow">
-        <h3 className="text-lg font-semibold mb-3">Income vs Expenses</h3>
-        <LineChartClient data={lineData} />
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-3">Income vs Expenses</h3>
+          <LineChartClient data={lineData} />
+        </div>
       </div>
-    </div>
   );
 };
 
