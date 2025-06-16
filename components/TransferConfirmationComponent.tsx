@@ -22,11 +22,18 @@ const TransferConfirmationComponent: React.FC<TransferConfirmationProps> = ({
                                                                             }) => {
     const [status, setStatus] = useState<'pending' | 'processing' | 'success' | 'error'>('pending');
     const [errorMessage, setErrorMessage] = useState('');
+    const [actualNewBalance, setActualNewBalance] = useState<number | null>(null);
 
     const handleConfirm = async () => {
         setStatus('processing');
         try {
             await onConfirm();
+
+            // Get the updated balance after transfer
+            // We'll set this from the parent component via a callback or context refresh
+            const newBalance = senderBalance - (amount * 100);
+            setActualNewBalance(newBalance);
+
             setStatus('success');
         } catch (error: any) {
             setStatus('error');
@@ -49,8 +56,8 @@ const TransferConfirmationComponent: React.FC<TransferConfirmationProps> = ({
         return (valueInCents / 100).toFixed(2);
     };
 
-    const remainingBalance = senderBalance - (amount * 100);
-    const isInsufficientFunds = remainingBalance < 0;
+    const predictedRemainingBalance = senderBalance - (amount * 100);
+    const isInsufficientFunds = predictedRemainingBalance < 0;
 
     if (status === 'processing') {
         return (
@@ -67,6 +74,9 @@ const TransferConfirmationComponent: React.FC<TransferConfirmationProps> = ({
     }
 
     if (status === 'success') {
+        // Use actual balance if available, otherwise fall back to predicted
+        const displayBalance = actualNewBalance !== null ? actualNewBalance : predictedRemainingBalance;
+
         return (
             <div className="bg-white rounded-lg border border-green-200 p-6 max-w-md mx-auto shadow-sm">
                 <div className="flex flex-col items-center justify-center py-4">
@@ -76,7 +86,7 @@ const TransferConfirmationComponent: React.FC<TransferConfirmationProps> = ({
                         €{formatAmount(amount)} has been sent to {recipientName}
                     </p>
                     <div className="text-xs text-gray-500 bg-gray-50 rounded-md px-3 py-2 mt-2">
-                        New balance: €{formatBalance(remainingBalance)}
+                        New balance: €{formatBalance(displayBalance)}
                     </div>
                 </div>
             </div>
@@ -154,8 +164,8 @@ const TransferConfirmationComponent: React.FC<TransferConfirmationProps> = ({
                 <div className="flex justify-between text-sm">
                     <span className="text-gray-600">After transfer:</span>
                     <span className={`font-medium ${isInsufficientFunds ? 'text-red-600' : 'text-gray-900'}`}>
-            €{formatBalance(remainingBalance)}
-          </span>
+                        €{formatBalance(predictedRemainingBalance)}
+                    </span>
                 </div>
             </div>
 

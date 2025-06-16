@@ -43,13 +43,17 @@ export function useQuantumBankActions() {
     });
 
     // ===============================
-    // SECURE TRANSFER ACTIONS (CONFIRMATION MANDATORY)
+    // SINGLE SECURE TRANSFER ACTION (CONFIRMATION MANDATORY)
     // ===============================
 
-    // ONLY transfer action - always uses in-chat confirmation
     useCopilotAction({
-        name: "sendMoneyInChat",
-        description: "Send money with mandatory in-chat confirmation widget (ONLY method for transfers)",
+        name: "sendMoney",
+        description: `Send money with MANDATORY in-chat confirmation widget. 
+        
+        CRITICAL SECURITY RULE: This action ALWAYS shows a confirmation widget first. 
+        There is NO way to bypass confirmation. No direct transfers allowed.
+        
+        Usage: When user wants to send money, ALWAYS use this action and let the widget handle confirmation.`,
         parameters: [
             {
                 name: "recipientName",
@@ -71,6 +75,7 @@ export function useQuantumBankActions() {
             },
         ],
         handler: async ({ recipientName, amount, description }) => {
+            // NEVER complete the transfer in the handler - only validate and prepare
             if (!user) {
                 return "❌ You must be logged in to send money.";
             }
@@ -80,11 +85,11 @@ export function useQuantumBankActions() {
                 return "❌ Please provide a valid recipient name or email.";
             }
 
-            if (!amount || typeof amount !== 'number') {
-                return "❌ Please provide a valid amount.";
+            if (!amount || typeof amount !== 'number' || amount <= 0) {
+                return "❌ Please provide a valid amount greater than zero.";
             }
 
-            // Find recipient with safe string operations
+            // Find recipient
             const recipient = users.find(
                 u => u.userId?.toLowerCase() === recipientName.toLowerCase() ||
                     u.email?.toLowerCase() === recipientName.toLowerCase()
@@ -99,12 +104,14 @@ export function useQuantumBankActions() {
                 return `❌ Could not find user "${recipientName}". Available users: ${availableUsers.join(", ")}`;
             }
 
-            // Validate amount
-            if (amount <= 0) {
-                return "❌ Amount must be greater than zero.";
+            // Check balance
+            const amountInCents = Math.round(amount * 100);
+            if (user.balance < amountInCents) {
+                return `❌ Insufficient funds. Your balance: €${formatAmount(user.balance / 100)}, required: €${formatAmount(amount)}`;
             }
 
-            return `🔒 Setting up secure transfer confirmation for €${formatAmount(amount)} to ${recipient.userId}...`;
+            // Return message that widget will appear - DO NOT process transfer here
+            return `🔒 Transfer prepared: €${formatAmount(amount)} to ${recipient.userId}. Please confirm in the widget below.`;
         },
         render: ({ status, args }) => {
             if (!user || !args) return <div>Loading...</div>;
@@ -127,103 +134,7 @@ export function useQuantumBankActions() {
                 );
             }
 
-            return (
-                <TransferConfirmationComponent
-                    recipientName={recipient.userId}
-                    recipientEmail={recipient.email}
-                    amount={amount}
-                    description={description}
-                    senderBalance={user.balance}
-                    onConfirm={async () => {
-                        const amountInCents = Math.round(amount * 100);
-
-                        if (user.balance < amountInCents) {
-                            throw new Error("Insufficient funds");
-                        }
-
-                        const transferData: TransferData = {
-                            senderUserId: user.$id,
-                            receiverUserId: recipient.$id,
-                            amount: amountInCents,
-                            description: description || `Transfer to ${recipient.userId}`
-                        };
-
-                        const result = await TransferService.executeTransfer(transferData);
-
-                        if (!result.success) {
-                            throw new Error(result.error || 'Transfer failed');
-                        }
-
-                        await refreshUser(true);
-                    }}
-                    onDeny={() => {
-                        // Cancellation handled by component
-                    }}
-                />
-            );
-        },
-    });
-
-    // Redirect any direct transfer attempts to secure confirmation
-    useCopilotAction({
-        name: "sendMoneyDirect",
-        description: "DEPRECATED: Redirects to secure confirmation - all transfers require confirmation",
-        parameters: [
-            {
-                name: "recipientName",
-                type: "string",
-                description: "The username or email of the recipient",
-                required: true,
-            },
-            {
-                name: "amount",
-                type: "number",
-                description: "The amount to send in euros",
-                required: true,
-            },
-            {
-                name: "description",
-                type: "string",
-                description: "Optional description for the transfer",
-                required: false,
-            },
-        ],
-        handler: async ({ recipientName, amount, description }) => {
-            // Validate input parameters
-            if (!recipientName || typeof recipientName !== 'string') {
-                return "❌ Please provide a valid recipient name or email.";
-            }
-
-            if (!amount || typeof amount !== 'number') {
-                return "❌ Please provide a valid amount.";
-            }
-
-            return `🔒 For your security and financial protection, all transfers require confirmation. I'll show you the secure confirmation widget where you can review all details before proceeding.
-
-Amount: €${formatAmount(amount)}
-Recipient: ${recipientName}
-${description ? `Description: ${description}` : ''}
-
-The confirmation widget will appear below this message.`;
-        },
-        render: ({ status, args }) => {
-            if (!user || !args) return <div>Loading...</div>;
-
-            const { recipientName, amount, description } = args;
-
-            const recipient = users.find(
-                u => u.userId?.toLowerCase() === recipientName?.toLowerCase() ||
-                    u.email?.toLowerCase() === recipientName?.toLowerCase()
-            );
-
-            if (!recipient) {
-                return (
-                    <div className="p-4 border rounded-lg bg-red-50 border-red-200">
-                        <p className="text-red-700">❌ Recipient "{recipientName}" not found.</p>
-                    </div>
-                );
-            }
-
+            // ALWAYS show the confirmation widget - no bypassing allowed
             return (
                 <TransferConfirmationComponent
                     recipientName={recipient.userId}
