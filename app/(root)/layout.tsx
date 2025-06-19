@@ -8,11 +8,10 @@ import CopilotChartHandler from "@/components/CopilotChartHandler";
 import { EnhancedCopilotPopup } from "@/components/EnhancedCopilotPopup";
 import { motion } from "framer-motion";
 import useUser from "@/hooks/useUser";
+import ClientAuthCheck from "@/components/ClientAuthCheck"; // Import the auth check
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
     const { user } = useUser();
-
-    // All Copilot actions are now handled in EnhancedCopilotPopup via useQuantumBankActions()
 
     const animationVariants = {
         hidden: { opacity: 0, y: 20 },
@@ -22,24 +21,27 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
     return (
         <CopilotKit runtimeUrl="/api/copilotkit">
-            <main className="flex h-screen w-full font-inter">
-                <Sidebar user={user} />
-                <motion.div
-                    className="flex w-full"
-                    variants={animationVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
-                >
-                    {children}
-                </motion.div>
+            {/* Wrap everything in ClientAuthCheck to enforce authentication */}
+            <ClientAuthCheck>
+                <main className="flex h-screen w-full font-inter">
+                    <Sidebar user={user} />
+                    <motion.div
+                        className="flex w-full"
+                        variants={animationVariants}
+                        initial="hidden"
+                        animate="visible"
+                        exit="exit"
+                    >
+                        {children}
+                    </motion.div>
 
-                {/* Use the enhanced CopilotPopup with money transfer integration */}
-                <EnhancedCopilotPopup />
+                    {/* Use the enhanced CopilotPopup with money transfer integration */}
+                    <EnhancedCopilotPopup />
 
-                {/* Keep the chart handler for data visualization */}
-                <CopilotChartHandler />
-            </main>
+                    {/* Keep the chart handler for data visualization */}
+                    <CopilotChartHandler />
+                </main>
+            </ClientAuthCheck>
         </CopilotKit>
     );
 }
