@@ -4,7 +4,8 @@ import "@copilotkit/react-ui/styles.css";
 import type { Metadata } from "next";
 import { Inter, IBM_Plex_Serif } from "next/font/google";
 import "./globals.css";
-import CopilotProvider from "./CopilotProvider"; // Client-Wrapper importieren
+import CopilotProvider from "./CopilotProvider";
+import ClientAuthCheck from "@/components/ClientAuthCheck";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const ibmPlexSerif = IBM_Plex_Serif({
@@ -22,18 +23,17 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({
-  children,
-}: Readonly<{ children: ReactNode }>) {
+                                     children,
+                                   }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en">
+      <html lang="en">
       <body className={`${inter.variable} ${ibmPlexSerif.variable} flex h-screen`}>
-        {/* 
-          Sidebar und Content-Layout können hier angelagert werden (z. B. <Sidebar>).
-          Der wichtigste Punkt: Wir umschließen den gesamten App-Content (children)
-          mit unserem CopilotProvider, der die CopilotKit-Client-Only-Logik kapselt.
-        */}
-        <CopilotProvider>{children}</CopilotProvider>
+      <CopilotProvider>
+        <ClientAuthCheck>
+          {children}
+        </ClientAuthCheck>
+      </CopilotProvider>
       </body>
-    </html>
+      </html>
   );
 }

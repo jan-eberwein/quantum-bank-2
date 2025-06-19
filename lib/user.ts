@@ -8,13 +8,24 @@ const USERS_COLLECTION_ID = process.env.NEXT_PUBLIC_APPWRITE_USERS_COLLECTION_ID
 
 export async function getCurrentUserProfile(): Promise<UserProfile | null> {
     try {
+        // ✅ First check if user is authenticated
         const current = await account.get();
+
+        if (!current || !current.email) {
+            return null;
+        }
+
+        // ✅ Then fetch user document from database
         const userDocs = await database.listDocuments(
             DATABASE_ID,
             USERS_COLLECTION_ID,
             [Query.equal("email", current.email)]
         );
-        if (!userDocs.documents.length) return null;
+
+        if (!userDocs.documents.length) {
+            return null;
+        }
+
         const doc = userDocs.documents[0];
         return {
             $id: doc.$id,
@@ -28,9 +39,19 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
             securityNotificationsEnabled: doc.securityNotificationsEnabled ?? false,
             updateNotificationsEnabled: doc.updateNotificationsEnabled ?? false,
         };
-    } catch (err) {
-        console.error("Error fetching user profile:", err);
-        return null;
+    } catch (err: any) {
+        // ✅ Handle authentication errors silently - these are expected on auth pages
+        if (err.code === 401 ||
+            err.message?.includes('missing scope') ||
+            err.message?.includes('guests') ||
+            err.message?.includes('Unauthorized')) {
+            // Don't log or throw - just return null for unauthenticated users
+            return null;
+        }
+
+        // For other unexpected errors, still throw but with a cleaner message
+        console.error("Unexpected error in getCurrentUserProfile:", err);
+        throw new Error("Failed to fetch user profile");
     }
 }
 

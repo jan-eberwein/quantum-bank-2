@@ -1,4 +1,6 @@
+// hooks/useAllUsers.ts
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { database } from '@/lib/appwrite';
 import { Query } from 'appwrite';
 
@@ -10,11 +12,24 @@ export interface UserForTransfer {
 
 export function useAllUsers() {
     const [users, setUsers] = useState<UserForTransfer[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false); // Start with false
     const [error, setError] = useState<string | null>(null);
+    const pathname = usePathname();
+
+    // Check if we're on an authentication page
+    const isAuthPage = pathname === '/sign-in' || pathname === '/sign-up';
 
     useEffect(() => {
         const fetchUsers = async () => {
+            // Don't fetch data on auth pages
+            if (isAuthPage) {
+                setUsers([]);
+                setLoading(false);
+                setError(null);
+                return;
+            }
+
+            setLoading(true);
             try {
                 const response = await database.listDocuments(
                     process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
@@ -33,16 +48,23 @@ export function useAllUsers() {
                 }));
 
                 setUsers(mappedUsers);
+                setError(null);
             } catch (err: any) {
-                console.error('Error fetching users:', err);
-                setError('Failed to load users');
+                // Only log/set errors if not on auth pages and not authentication errors
+                if (!isAuthPage && !err.message?.includes('missing scope') && !err.message?.includes('guests')) {
+                    console.error('Error fetching users:', err);
+                    setError('Failed to load users');
+                } else {
+                    setUsers([]);
+                    setError(null);
+                }
             } finally {
                 setLoading(false);
             }
         };
 
         fetchUsers();
-    }, []);
+    }, [isAuthPage]);
 
     return { users, loading, error };
 }

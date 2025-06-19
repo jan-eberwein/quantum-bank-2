@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -19,8 +19,10 @@ const AuthForm: React.FC<AuthFormProps> = ({ type }) => {
   const [password, setPassword] = useState("");
   const [userId, setUserId] = useState(""); // used for sign-up only
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { refreshUser } = useUser();
 
   const validateEmail = (email: string) =>
@@ -29,14 +31,17 @@ const AuthForm: React.FC<AuthFormProps> = ({ type }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setIsLoading(true);
 
     if (!validateEmail(email)) {
       setError("Please enter a valid email address.");
+      setIsLoading(false);
       return;
     }
 
     if (password.length < 6) {
       setError("Password must be at least 6 characters long.");
+      setIsLoading(false);
       return;
     }
 
@@ -58,12 +63,28 @@ const AuthForm: React.FC<AuthFormProps> = ({ type }) => {
         await signIn(email, password);
       }
 
-      // Refresh global user context now that authentication has succeeded
+      // Refresh global user context
       await refreshUser();
 
-      router.push("/");
+      // Get redirect URL from query params or default to dashboard
+      const redirectTo = searchParams.get("redirect") || "/";
+
+      // Simple redirect - works with localStorage
+      router.push(redirectTo);
+
     } catch (err: any) {
-      setError(err.message || "An unknown error occurred.");
+      console.error("Authentication error:", err);
+      if (err.message?.includes("session is active") || err.message?.includes("Creation of a session is prohibited")) {
+        setError("Session conflict. Redirecting...");
+        setTimeout(() => {
+          const redirectTo = searchParams.get("redirect") || "/";
+          router.push(redirectTo);
+        }, 1000);
+      } else {
+        setError(err.message || "An unknown error occurred.");
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -96,6 +117,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ type }) => {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
                 required
+                disabled={isLoading}
             />
           </div>
 
@@ -108,6 +130,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ type }) => {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
                 required
+                disabled={isLoading}
             />
           </div>
 
@@ -121,14 +144,22 @@ const AuthForm: React.FC<AuthFormProps> = ({ type }) => {
                     onChange={(e) => setUserId(e.target.value)}
                     placeholder="e.g., jan-eberwein"
                     required
+                    disabled={isLoading}
                 />
               </div>
           )}
 
           {error && <p className="form-message text-red-600">{error}</p>}
 
-          <Button type="submit" className="form-btn w-full">
-            {type === "sign-in" ? "Sign In" : "Sign Up"}
+          <Button type="submit" className="form-btn w-full" disabled={isLoading}>
+            {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  {type === "sign-in" ? "Signing In..." : "Signing Up..."}
+                </span>
+            ) : (
+                type === "sign-in" ? "Sign In" : "Sign Up"
+            )}
           </Button>
         </form>
 

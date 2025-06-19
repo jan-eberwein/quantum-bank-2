@@ -21,9 +21,81 @@ interface ChartsBoxProps {
 const ChartsBox: React.FC<ChartsBoxProps> = ({ refreshKey = 0 }) => {
   const { user } = useUser();
 
-  // ✅ Pass refreshKey to useTransactions to trigger data refresh
+  // ✅ Always call hooks unconditionally - fix for hooks order error
   const { transactions, loading: transactionsLoading } = useTransactions(user?.$id, refreshKey);
   const { categories, loading: categoriesLoading } = useTransactionCategories();
+
+  // ✅ Always calculate chart data (memoized) even if user is null
+  const pieData = useMemo(() => {
+    if (!user || !transactions.length || !categories.length) return [];
+
+    const totals = new Map<string, number>();
+    transactions.forEach((t) => {
+      if (t.amount < 0) {
+        const euros = Math.abs(t.amount) / 100;
+        const name =
+            categories.find((c) => c.$id === t.transactionCategoryId)?.name ||
+            "Uncategorized";
+        totals.set(name, (totals.get(name) || 0) + euros);
+      }
+    });
+    return Array.from(totals, ([category, amount]) => ({ category, amount }));
+  }, [user, transactions, categories, refreshKey]);
+
+  const barData = useMemo(() => {
+    if (!user || !transactions.length) return [];
+
+    const totals = new Map<string, number>();
+    transactions.forEach((t) => {
+      if (t.amount < 0) {
+        const month = format(new Date(t.createdAt), "MMM");
+        const euros = Math.abs(t.amount) / 100;
+        totals.set(month, (totals.get(month) || 0) + euros);
+      }
+    });
+    // sort by calendar order
+    const monthsOrder = [
+      "Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"
+    ];
+    return Array.from(totals, ([month, amount]) => ({ month, amount }))
+        .sort((a, b) => monthsOrder.indexOf(a.month) - monthsOrder.indexOf(b.month));
+  }, [user, transactions, refreshKey]);
+
+  const lineData = useMemo(() => {
+    if (!user || !transactions.length) return [];
+
+    const map = new Map<string, { income: number; expenses: number }>();
+    transactions.forEach((t) => {
+      const month = format(new Date(t.createdAt), "MMM");
+      const entry = map.get(month) ?? { income: 0, expenses: 0 };
+      if (t.amount > 0) entry.income += t.amount / 100;
+      else entry.expenses += Math.abs(t.amount) / 100;
+      map.set(month, entry);
+    });
+    const monthsOrder = [
+      "Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"
+    ];
+    return Array.from(map, ([month, { income, expenses }]) => ({
+      month,
+      income,
+      expenses,
+    })).sort((a, b) => monthsOrder.indexOf(a.month) - monthsOrder.indexOf(b.month));
+  }, [user, transactions, refreshKey]);
+
+  // ✅ Early return AFTER all hooks have been called
+  if (!user) {
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+          {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white p-4 rounded-lg shadow">
+                <div className="h-48 flex items-center justify-center text-gray-500">
+                  Please log in to view charts
+                </div>
+              </div>
+          ))}
+        </div>
+    );
+  }
 
   // Show loading state while data is being fetched
   if (transactionsLoading || categoriesLoading) {
@@ -41,68 +113,11 @@ const ChartsBox: React.FC<ChartsBoxProps> = ({ refreshKey = 0 }) => {
     );
   }
 
-  // 1) Spending by category (in €) - Updated with refreshKey dependency
-  const pieData = useMemo(() => {
-    console.log('🔄 Recalculating pie chart data - refreshKey:', refreshKey);
-    const totals = new Map<string, number>();
-    transactions.forEach((t) => {
-      if (t.amount < 0) {
-        const euros = Math.abs(t.amount) / 100;
-        const name =
-            categories.find((c) => c.$id === t.transactionCategoryId)?.name ||
-            "Uncategorized";
-        totals.set(name, (totals.get(name) || 0) + euros);
-      }
-    });
-    return Array.from(totals, ([category, amount]) => ({ category, amount }));
-  }, [transactions, categories, refreshKey]); // ✅ refreshKey dependency added
-
-  // 2) Monthly spending - Updated with refreshKey dependency
-  const barData = useMemo(() => {
-    console.log('🔄 Recalculating bar chart data - refreshKey:', refreshKey);
-    const totals = new Map<string, number>();
-    transactions.forEach((t) => {
-      if (t.amount < 0) {
-        const month = format(new Date(t.createdAt), "MMM");
-        const euros = Math.abs(t.amount) / 100;
-        totals.set(month, (totals.get(month) || 0) + euros);
-      }
-    });
-    // sort by calendar order
-    const monthsOrder = [
-      "Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"
-    ];
-    return Array.from(totals, ([month, amount]) => ({ month, amount }))
-        .sort((a, b) => monthsOrder.indexOf(a.month) - monthsOrder.indexOf(b.month));
-  }, [transactions, refreshKey]); // ✅ refreshKey dependency added
-
-  // 3) Income vs. expenses per month - Updated with refreshKey dependency
-  const lineData = useMemo(() => {
-    console.log('🔄 Recalculating line chart data - refreshKey:', refreshKey);
-    const map = new Map<string, { income: number; expenses: number }>();
-    transactions.forEach((t) => {
-      const month = format(new Date(t.createdAt), "MMM");
-      const entry = map.get(month) ?? { income: 0, expenses: 0 };
-      if (t.amount > 0) entry.income += t.amount / 100;
-      else entry.expenses += Math.abs(t.amount) / 100;
-      map.set(month, entry);
-    });
-    const monthsOrder = [
-      "Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"
-    ];
-    return Array.from(map, ([month, { income, expenses }]) => ({
-      month,
-      income,
-      expenses,
-    })).sort((a, b) => monthsOrder.indexOf(a.month) - monthsOrder.indexOf(b.month));
-  }, [transactions, refreshKey]); // ✅ refreshKey dependency added
-
   return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
         <div className="bg-white p-4 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-3">
             Spending by Categories
-            {/* Debug indicator */}
             <span className="text-xs text-gray-400 ml-2">({pieData.length} categories)</span>
           </h3>
           {pieData.length > 0 ? (

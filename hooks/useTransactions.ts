@@ -1,40 +1,45 @@
+// hooks/useTransactions.ts
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { database } from '@/lib/appwrite';
 import { Query } from 'appwrite';
 import { Transaction, isTransaction } from '@/types/Transaction';
 
 const useTransactions = (userId: string | undefined, refreshKey: number = 0) => {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
-    const [loading, setLoading] = useState<boolean>(true);
+    const [loading, setLoading] = useState<boolean>(false); // Start with false
     const [error, setError] = useState<string | null>(null);
+    const pathname = usePathname();
+
+    // Check if we're on an authentication page
+    const isAuthPage = pathname === '/sign-in' || pathname === '/sign-up';
 
     useEffect(() => {
         const fetchTransactions = async () => {
-            if (!userId) {
+            // Don't fetch data on auth pages or if no userId
+            if (isAuthPage || !userId) {
                 setTransactions([]);
                 setLoading(false);
+                setError(null);
                 return;
             }
 
-            // ✅ Only show loading spinner on initial load, not on refreshes
+            // Only show loading spinner on initial load, not on refreshes
             if (transactions.length === 0) {
                 setLoading(true);
             }
 
             try {
-                console.log('🔄 Fetching transactions for user:', userId, 'refreshKey:', refreshKey);
-
                 const res = await database.listDocuments(
                     process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
                     process.env.NEXT_PUBLIC_APPWRITE_TRANSACTIONS_COLLECTION_ID!,
                     [
                         Query.equal('userId', userId),
                         Query.orderDesc('createdAt'),
-                        Query.limit(1000) // Adjust as needed
+                        Query.limit(1000)
                     ]
                 );
 
-                // Map and validate the response data
                 const mapped: Transaction[] = res.documents
                     .map((doc: any) => ({
                         $id: doc.$id,
@@ -48,21 +53,26 @@ const useTransactions = (userId: string | undefined, refreshKey: number = 0) => 
                         $createdAt: doc.$createdAt,
                         $updatedAt: doc.$updatedAt,
                     }))
-                    .filter(isTransaction); // Runtime type validation
+                    .filter(isTransaction);
 
-                console.log('✅ Fetched', mapped.length, 'transactions');
                 setTransactions(mapped);
                 setError(null);
             } catch (err: any) {
-                console.error('❌ Error fetching transactions:', err);
-                setError(err.message || 'Failed to fetch transactions');
+                // Only log/set errors if not on auth pages and not authentication errors
+                if (!isAuthPage && !err.message?.includes('missing scope') && !err.message?.includes('guests')) {
+                    console.error('Error fetching transactions:', err);
+                    setError(err.message || 'Failed to fetch transactions');
+                } else {
+                    setTransactions([]);
+                    setError(null);
+                }
             } finally {
                 setLoading(false);
             }
         };
 
         fetchTransactions();
-    }, [userId, refreshKey]); // ✅ refreshKey in dependencies triggers refetch
+    }, [userId, refreshKey, isAuthPage]); // Include isAuthPage in dependencies
 
     return { transactions, loading, error };
 };
