@@ -1,4 +1,3 @@
-// hooks/useQuantumBankActions.tsx
 "use client";
 
 import React from "react";
@@ -116,7 +115,12 @@ export function useQuantumBankActions() {
         render: ({ status, args }) => {
             if (!user || !args) return <div>Loading...</div>;
 
-            const { recipientName, amount, description } = args;
+            // Add type guard to ensure amount is a number
+            const { recipientName, amount, description } = args as {
+                recipientName: string,
+                amount: number,
+                description?: string
+            };
 
             const recipient = users.find(
                 u => u.userId?.toLowerCase() === recipientName?.toLowerCase() ||
@@ -139,7 +143,7 @@ export function useQuantumBankActions() {
                 <TransferConfirmationComponent
                     recipientName={recipient.userId}
                     recipientEmail={recipient.email}
-                    amount={amount}
+                    amount={amount} // Now we're sure amount is a number
                     description={description}
                     senderBalance={user.balance}
                     onConfirm={async () => {
@@ -171,6 +175,7 @@ export function useQuantumBankActions() {
             );
         },
     });
+
 
     // ===============================
     // ACCOUNT ACTIONS
