@@ -3,12 +3,13 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { signUpAndCreateProfile, signIn } from "@/lib/auth";
 import { useUser } from "@/context/UserContext";
+import { Loader2 } from "lucide-react";
 
 interface AuthFormProps {
   type: "sign-in" | "sign-up";
@@ -22,7 +23,6 @@ const AuthForm: React.FC<AuthFormProps> = ({ type }) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { refreshUser } = useUser();
 
   const validateEmail = (email: string) =>
@@ -63,26 +63,12 @@ const AuthForm: React.FC<AuthFormProps> = ({ type }) => {
         await signIn(email, password);
       }
 
-      // Refresh global user context
+      // Refresh global user context now that authentication has succeeded
       await refreshUser();
 
-      // Get redirect URL from query params or default to dashboard
-      const redirectTo = searchParams.get("redirect") || "/";
-
-      // Simple redirect - works with localStorage
-      router.push(redirectTo);
-
+      router.push("/");
     } catch (err: any) {
-      console.error("Authentication error:", err);
-      if (err.message?.includes("session is active") || err.message?.includes("Creation of a session is prohibited")) {
-        setError("Session conflict. Redirecting...");
-        setTimeout(() => {
-          const redirectTo = searchParams.get("redirect") || "/";
-          router.push(redirectTo);
-        }, 1000);
-      } else {
-        setError(err.message || "An unknown error occurred.");
-      }
+      setError(err.message || "An unknown error occurred.");
     } finally {
       setIsLoading(false);
     }
@@ -153,10 +139,10 @@ const AuthForm: React.FC<AuthFormProps> = ({ type }) => {
 
           <Button type="submit" className="form-btn w-full" disabled={isLoading}>
             {isLoading ? (
-                <span className="flex items-center gap-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   {type === "sign-in" ? "Signing In..." : "Signing Up..."}
-                </span>
+                </>
             ) : (
                 type === "sign-in" ? "Sign In" : "Sign Up"
             )}
