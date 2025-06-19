@@ -16,8 +16,14 @@ const useTransactions = (userId: string | undefined, refreshKey: number = 0) => 
                 return;
             }
 
-            setLoading(true);
+            // ✅ Only show loading spinner on initial load, not on refreshes
+            if (transactions.length === 0) {
+                setLoading(true);
+            }
+
             try {
+                console.log('🔄 Fetching transactions for user:', userId, 'refreshKey:', refreshKey);
+
                 const res = await database.listDocuments(
                     process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
                     process.env.NEXT_PUBLIC_APPWRITE_TRANSACTIONS_COLLECTION_ID!,
@@ -44,9 +50,11 @@ const useTransactions = (userId: string | undefined, refreshKey: number = 0) => 
                     }))
                     .filter(isTransaction); // Runtime type validation
 
+                console.log('✅ Fetched', mapped.length, 'transactions');
                 setTransactions(mapped);
+                setError(null);
             } catch (err: any) {
-                console.error('Error fetching transactions:', err);
+                console.error('❌ Error fetching transactions:', err);
                 setError(err.message || 'Failed to fetch transactions');
             } finally {
                 setLoading(false);
@@ -54,7 +62,7 @@ const useTransactions = (userId: string | undefined, refreshKey: number = 0) => 
         };
 
         fetchTransactions();
-    }, [userId, refreshKey]); // Added refreshKey to dependencies
+    }, [userId, refreshKey]); // ✅ refreshKey in dependencies triggers refetch
 
     return { transactions, loading, error };
 };
