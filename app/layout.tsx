@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     title: "Quantum Bank",
     description: "AI-powered banking application",
     icons: {
-        icon: "/icons/logo.svg",
+        icon: "/icons/favicon.svg",
     },
 };
 
