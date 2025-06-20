@@ -110,7 +110,7 @@ const CopilotUI = () => {
         setAccumulatedText(''); // Reset for new session
         SpeechRecognition.startListening({
             continuous: true,
-            language: 'en-US'
+            language: 'en-US' // Use both English and German
         });
     };
 
