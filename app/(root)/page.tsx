@@ -67,10 +67,10 @@ const Home: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="lasttransactions h-full flex flex-col">
-              <LastTransactionsWidget refreshKey={refreshKey} />
+              <SimpleMoneyTransfer onTransferComplete={handleTransferComplete} />
             </div>
             <div className="totalbalancebox h-full flex flex-col justify-between">
-              <SimpleMoneyTransfer onTransferComplete={handleTransferComplete} />
+              <LastTransactionsWidget refreshKey={refreshKey} />
             </div>
           </div>
 
