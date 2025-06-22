@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { useCopilotAction, useCopilotReadable } from "@copilotkit/react-core";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/context/UserContext";
@@ -41,8 +41,150 @@ export function useQuantumBankActions() {
         },
     });
 
+    // ✅ Listen for voice command events and execute corresponding actions
+    useEffect(() => {
+        const handleVoiceCommand = async (event: Event) => {
+            const customEvent = event as CustomEvent;
+            const { action, params } = customEvent.detail;
+
+            try {
+                let response = "";
+
+                switch (action) {
+                    case 'sendMoney':
+                        response = await handleSendMoney(params);
+                        break;
+                    case 'checkBalance':
+                        response = await handleCheckBalance();
+                        break;
+                    case 'listRecipients':
+                        response = await handleListRecipients();
+                        break;
+                    case 'navigateToPage':
+                        response = await handleNavigateToPage(params);
+                        break;
+                    case 'toggleSetting':
+                        response = await handleToggleSetting(params);
+                        break;
+                }
+
+                // Dispatch response back to voice system
+                if (response) {
+                    const responseEvent = new CustomEvent('voice-response', {
+                        detail: { response, action, params }
+                    });
+                    window.dispatchEvent(responseEvent);
+                }
+
+            } catch (error) {
+                console.error('Voice command execution error:', error);
+                const errorEvent = new CustomEvent('voice-response', {
+                    detail: {
+                        response: "Sorry, I couldn't execute that command.",
+                        error: true,
+                        action,
+                        params
+                    }
+                });
+                window.dispatchEvent(errorEvent);
+            }
+        };
+
+        window.addEventListener('voice-command', handleVoiceCommand as (event: Event) => void);
+
+        return () => {
+            window.removeEventListener('voice-command', handleVoiceCommand as (event: Event) => void);
+        };
+    }, [user, users, router]);
+
+    // Action handlers for voice commands
+    const handleSendMoney = async (params: any) => {
+        const { recipientName, amount, description } = params;
+
+        if (!user) {
+            return "❌ You must be logged in to send money.";
+        }
+
+        const recipient = users.find(
+            u => u.userId?.toLowerCase() === recipientName?.toLowerCase() ||
+                u.email?.toLowerCase() === recipientName?.toLowerCase()
+        );
+
+        if (!recipient) {
+            const availableUsers = users
+                .filter(u => u.$id !== user.$id)
+                .map(u => u.userId)
+                .slice(0, 5);
+            return `❌ Could not find user "${recipientName}". Available users: ${availableUsers.join(", ")}`;
+        }
+
+        const amountInCents = Math.round(amount * 100);
+        if (user.balance < amountInCents) {
+            return `❌ Insufficient funds. Balance: €${formatAmount(user.balance / 100)}, required: €${formatAmount(amount)}`;
+        }
+
+        return `🔒 Transfer prepared: €${formatAmount(amount)} to ${recipient.userId}. Please confirm using the visual confirmation widget.`;
+    };
+
+    const handleCheckBalance = async () => {
+        if (!user) {
+            return "❌ You must be logged in to check your balance.";
+        }
+        return `💰 Your current balance is €${formatAmount(user.balance / 100)}`;
+    };
+
+    const handleListRecipients = async () => {
+        if (!user) {
+            return "❌ You must be logged in to view recipients.";
+        }
+
+        const availableUsers = users
+            .filter(u => u.$id !== user.$id)
+            .map(u => `${u.userId}`)
+            .slice(0, 8);
+
+        if (availableUsers.length === 0) {
+            return "📭 No other users available for transfers.";
+        }
+
+        return `👥 Available recipients: ${availableUsers.join(", ")}. Say "Send €amount to username" to start a transfer.`;
+    };
+
+    const handleNavigateToPage = async (params: any) => {
+        const { page } = params;
+
+        switch (page.toLowerCase()) {
+            case 'transactions':
+            case 'transaction':
+                router.push('/transactions');
+                return `🧭 Navigating to transactions page.`;
+            case 'settings':
+            case 'setting':
+                router.push('/settings');
+                return `🧭 Navigating to settings page.`;
+            case 'dashboard':
+            case 'home':
+            case 'start':
+                router.push('/');
+                return `🧭 Navigating to dashboard.`;
+            default:
+                return `❌ Unknown page: ${page}. Available pages: transactions, settings, dashboard`;
+        }
+    };
+
+    const handleToggleSetting = async (params: any) => {
+        const { setting, value } = params;
+
+        const settingEvent = new CustomEvent('copilot-setting-toggle', {
+            detail: { setting, value }
+        });
+        window.dispatchEvent(settingEvent);
+
+        return `⚙️ ${setting} has been ${value ? 'enabled' : 'disabled'}.`;
+    };
+
     // ===============================
-    // SINGLE SECURE TRANSFER ACTION (CONFIRMATION MANDATORY)
+    // REGULAR COPILOT ACTIONS (for manual chat and confirmation widgets)
     // ===============================
 
     useCopilotAction({
@@ -176,9 +318,8 @@ export function useQuantumBankActions() {
         },
     });
 
-
     // ===============================
-    // ACCOUNT ACTIONS
+    // ADDITIONAL ACTIONS
     // ===============================
 
     useCopilotAction({
@@ -214,10 +355,6 @@ export function useQuantumBankActions() {
             return `👥 **Available Recipients:**\n\n${availableUsers.join('\n')}\n\n🔒 To send money securely, say: "Send €${formatAmount(50)} to [username]"`;
         },
     });
-
-    // ===============================
-    // NAVIGATION ACTIONS
-    // ===============================
 
     useCopilotAction({
         name: "navigateToPage",
@@ -279,10 +416,6 @@ export function useQuantumBankActions() {
             return `🧭 Navigating to transactions page${filterType ? ` (showing ${filterType} transfers)` : ""}...`;
         },
     });
-
-    // ===============================
-    // SETTINGS ACTIONS
-    // ===============================
 
     useCopilotAction({
         name: "toggleSetting",

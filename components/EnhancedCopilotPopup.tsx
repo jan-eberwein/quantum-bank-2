@@ -3,11 +3,41 @@
 
 import React from "react";
 import { CopilotPopup } from "@copilotkit/react-ui";
-import { useQuantumBankActions } from "@/hooks/useQuantumBankActions";
+import { useCopilotReadable } from "@copilotkit/react-core";
+import { useUser } from "@/context/UserContext";
+import { useAllUsers } from "@/hooks/useAllUsers";
+import { formatEuroCents } from "@/lib/format";
 
 export function EnhancedCopilotPopup() {
-    // Use the consolidated actions hook
-    useQuantumBankActions();
+    const { user } = useUser();
+    const { users } = useAllUsers();
+
+    // Format amount to always show 2 decimal places
+    const formatAmount = (value: number | undefined | null) => {
+        if (typeof value !== 'number' || isNaN(value)) return '0.00';
+        return value.toFixed(2);
+    };
+
+    // ✅ Only provide readable data - actions are handled by Sidebar
+    useCopilotReadable({
+        description: "Current user balance and available transfer recipients for popup interface",
+        value: {
+            currentUser: user ? {
+                id: user.$id,
+                name: user.userId,
+                email: user.email,
+                balance: formatAmount(user.balance / 100),
+                formattedBalance: formatEuroCents(user.balance)
+            } : null,
+            availableRecipients: users
+                .filter(u => u.$id !== user?.$id)
+                .map(u => ({
+                    id: u.$id,
+                    name: u.userId,
+                    email: u.email
+                }))
+        },
+    });
 
     return (
         <CopilotPopup
@@ -30,7 +60,7 @@ Examples of requests you MUST decline:
 **Always respond:** "For your security and financial protection, all transfers require confirmation. I'll show you the confirmation widget where you can review all details before proceeding."
 
 ### 💬 In-Chat Confirmation (ONLY Method)
-Use **sendMoneyInChat** exclusively for all transfers:
+Use **sendMoney** exclusively for all transfers:
 - ✅ Shows detailed confirmation card in chat
 - ✅ Displays exact amounts with proper formatting (e.g., €42.90, not €42.9)
 - ✅ Validates recipient and available balance

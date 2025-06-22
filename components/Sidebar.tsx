@@ -1,13 +1,13 @@
 // components/Sidebar.tsx
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import dynamic from "next/dynamic";
 import { sidebarLinks } from "@/constants";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import UserCard from "./UserCard";
 import { useCopilotReadable } from "@copilotkit/react-core";
 import { format } from "date-fns";
@@ -21,6 +21,7 @@ interface SidebarProps {
 
 const Sidebar = ({ user }: SidebarProps) => {
   const pathname = usePathname();
+  const router = useRouter();
 
   // Make sidebar data readable by Copilot (non-action data only)
   useCopilotReadable({
@@ -42,7 +43,83 @@ const Sidebar = ({ user }: SidebarProps) => {
     value: currentDate,
   });
 
-  // ❌ REMOVED: All Copilot actions - now handled only in EnhancedCopilotPopup
+  // ✅ Handle voice command events from CopilotUI
+  useEffect(() => {
+    const handleVoiceCommand = async (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { action, params } = customEvent.detail;
+
+      try {
+        switch (action) {
+          case 'sendMoney':
+            // Trigger the sendMoney action through the global action system
+            const sendEvent = new CustomEvent('copilot-action', {
+              detail: {
+                action: 'sendMoney',
+                args: params
+              }
+            });
+            window.dispatchEvent(sendEvent);
+            break;
+
+          case 'checkBalance':
+            const balanceEvent = new CustomEvent('copilot-action', {
+              detail: {
+                action: 'checkBalance',
+                args: {}
+              }
+            });
+            window.dispatchEvent(balanceEvent);
+            break;
+
+          case 'listRecipients':
+            const recipientsEvent = new CustomEvent('copilot-action', {
+              detail: {
+                action: 'listRecipients',
+                args: {}
+              }
+            });
+            window.dispatchEvent(recipientsEvent);
+            break;
+
+          case 'navigateToPage':
+            // Direct navigation for voice commands
+            const { page } = params;
+            switch (page.toLowerCase()) {
+              case 'transactions':
+              case 'transaction':
+                router.push('/transactions');
+                break;
+              case 'settings':
+              case 'setting':
+                router.push('/settings');
+                break;
+              case 'dashboard':
+              case 'home':
+              case 'start':
+                router.push('/');
+                break;
+            }
+            break;
+
+          case 'toggleSetting':
+            const settingEvent = new CustomEvent('copilot-setting-toggle', {
+              detail: params
+            });
+            window.dispatchEvent(settingEvent);
+            break;
+        }
+      } catch (error) {
+        console.error('Voice command execution error:', error);
+      }
+    };
+
+    window.addEventListener('voice-command', handleVoiceCommand as (event: Event) => void);
+
+    return () => {
+      window.removeEventListener('voice-command', handleVoiceCommand as (event: Event) => void);
+    };
+  }, [router]);
 
   return (
       <section className="sidebar flex flex-col h-full">
@@ -107,7 +184,7 @@ const Sidebar = ({ user }: SidebarProps) => {
           })}
         </nav>
 
-        {/* Render CopilotUI only on the client - NO ACTION REGISTRATION HERE */}
+        {/* Render CopilotUI only on the client - WITH VOICE COMMAND INTEGRATION */}
         <CopilotUI />
 
         <UserCard />
