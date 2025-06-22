@@ -7,7 +7,17 @@ import SpeechRecognition, {
 } from "react-speech-recognition";
 import { Mic, MicOff, Volume2, VolumeX, Zap, MessageSquare } from "lucide-react";
 
-const CopilotUI = () => {
+interface VoiceActionHandlers {
+    navigateToPage: (page: string) => string;
+    checkBalance: () => string;
+    listRecipients: () => string;
+}
+
+interface CopilotUIProps {
+    voiceActionHandlers: VoiceActionHandlers;
+}
+
+const CopilotUI = ({ voiceActionHandlers }: CopilotUIProps) => {
     const {
         transcript,
         finalTranscript,
@@ -52,9 +62,9 @@ const CopilotUI = () => {
         speechSynthRef.current.speak(utterance);
     }, [voiceFeedbackEnabled]);
 
-    // React-compatible text injection that properly updates component state
+    // React-compatible text injection for AI chat
     const injectTextIntoChat = useCallback((text: string) => {
-        console.log('🎯 Attempting to inject text:', text);
+        console.log('🎯 Injecting text into chat:', text);
 
         const attempts = [200, 500, 1000];
 
@@ -75,7 +85,6 @@ const CopilotUI = () => {
                         const placeholder = ta.placeholder?.toLowerCase() || '';
                         if (placeholder.includes('type') || placeholder.includes('message') || placeholder.includes('command')) {
                             targetTextArea = ta;
-                            console.log('✅ Found chat textarea:', ta);
                             break;
                         }
                     }
@@ -83,16 +92,10 @@ const CopilotUI = () => {
 
                 if (targetTextArea) {
                     try {
-                        // Focus first
+                        // Focus and set value
                         targetTextArea.focus();
 
-                        // Get React's internal instance to update state properly
-                        const reactFiber = (targetTextArea as any)._reactInternalFiber ||
-                            (targetTextArea as any)._reactInternalInstance ||
-                            Object.keys(targetTextArea).find(key => key.startsWith('__reactInternalInstance')) ||
-                            Object.keys(targetTextArea).find(key => key.startsWith('__reactFiber'));
-
-                        // Method 1: Use React's value setter
+                        // Use React-compatible value setting
                         const nativeTextAreaSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
                         if (nativeTextAreaSetter) {
                             nativeTextAreaSetter.call(targetTextArea, text);
@@ -100,25 +103,14 @@ const CopilotUI = () => {
                             targetTextArea.value = text;
                         }
 
-                        // Method 2: Create proper React synthetic event
+                        // Dispatch input event
                         const inputEvent = new Event('input', { bubbles: true });
                         Object.defineProperty(inputEvent, 'target', { value: targetTextArea, enumerable: true });
-                        Object.defineProperty(inputEvent, 'currentTarget', { value: targetTextArea, enumerable: true });
-
-                        // Dispatch multiple events to ensure React catches it
                         targetTextArea.dispatchEvent(inputEvent);
 
-                        // Also try change event
-                        const changeEvent = new Event('change', { bubbles: true });
-                        Object.defineProperty(changeEvent, 'target', { value: targetTextArea, enumerable: true });
-                        targetTextArea.dispatchEvent(changeEvent);
-
-                        console.log('✅ Text set with React-compatible events');
-
-                        // Wait a bit for React to process, then submit
+                        // Submit with Enter key
                         setTimeout(() => {
-                            // Method 1: Try keyboard Enter (most reliable for forms)
-                            const enterKeyDown = new KeyboardEvent('keydown', {
+                            const enterEvent = new KeyboardEvent('keydown', {
                                 key: 'Enter',
                                 code: 'Enter',
                                 keyCode: 13,
@@ -126,48 +118,14 @@ const CopilotUI = () => {
                                 bubbles: true,
                                 cancelable: true
                             });
-
-                            const enterKeyPress = new KeyboardEvent('keypress', {
-                                key: 'Enter',
-                                code: 'Enter',
-                                keyCode: 13,
-                                which: 13,
-                                bubbles: true,
-                                cancelable: true
-                            });
-
-                            console.log('⌨️ Sending Enter key events');
-                            targetTextArea.dispatchEvent(enterKeyDown);
-                            targetTextArea.dispatchEvent(enterKeyPress);
-
-                            // Method 2: Also try clicking submit button as backup
-                            setTimeout(() => {
-                                const buttons = document.querySelectorAll('button');
-                                for (const button of buttons) {
-                                    const btn = button as HTMLButtonElement;
-                                    const buttonText = btn.textContent?.toLowerCase() || '';
-                                    const buttonHTML = btn.innerHTML?.toLowerCase() || '';
-
-                                    if (!btn.disabled &&
-                                        (btn.type === 'submit' ||
-                                            buttonText.includes('send') ||
-                                            buttonHTML.includes('arrow') ||
-                                            buttonHTML.includes('svg'))) {
-                                        console.log('🖱️ Clicking submit button as backup');
-                                        btn.click();
-                                        break;
-                                    }
-                                }
-                            }, 100);
-
-                        }, 500); // Wait longer for React to process the input
+                            targetTextArea.dispatchEvent(enterEvent);
+                        }, 300);
 
                     } catch (error) {
-                        console.error('❌ Error during text injection:', error);
+                        console.error('Error during text injection:', error);
                         tryInject(attemptIndex + 1);
                     }
                 } else {
-                    console.log(`❌ No suitable textarea found, attempt ${attemptIndex + 1}/${attempts.length}`);
                     tryInject(attemptIndex + 1);
                 }
             }, attempts[attemptIndex]);
@@ -176,29 +134,102 @@ const CopilotUI = () => {
         tryInject(0);
     }, []);
 
-    // Submit ALL voice input directly to chat without filtering
+    // Smart voice command router - decides between direct action vs AI chat
     const parseAndExecuteVoiceCommand = useCallback(async (text: string) => {
-        if (text.trim()) {
-            setProcessingCommand(true);
+        if (!text.trim()) return false;
 
-            try {
-                // Submit ANY voice input directly to chat
-                injectTextIntoChat(text.trim());
-                speakText(`Processing: ${text}`);
-                console.log('✅ Voice input submitted directly:', text);
+        setProcessingCommand(true);
+        const cleanText = text.trim().toLowerCase();
 
-            } catch (error) {
-                console.error('Voice input error:', error);
-                const errorMsg = "Sorry, I couldn't process that. Please try again.";
-                speakText(errorMsg);
+        try {
+            // 🎯 DIRECT ACTION PATTERNS - for reliable simple commands
+            const directActionPatterns = [
+                // Navigation commands
+                {
+                    patterns: [
+                        /^(go to|show|open|navigate to)\s*(transactions?|transaction)$/i,
+                        /^transactions?$/i,
+                        /^show\s*transactions?$/i
+                    ],
+                    action: () => {
+                        const response = voiceActionHandlers.navigateToPage('transactions');
+                        speakText(response);
+                        return true;
+                    }
+                },
+                {
+                    patterns: [
+                        /^(go to|show|open|navigate to)\s*settings?$/i,
+                        /^settings?$/i,
+                        /^account\s*settings?$/i
+                    ],
+                    action: () => {
+                        const response = voiceActionHandlers.navigateToPage('settings');
+                        speakText(response);
+                        return true;
+                    }
+                },
+                {
+                    patterns: [
+                        /^(go to|show|open|navigate to)\s*(dashboard|home|start)$/i,
+                        /^(dashboard|home)$/i
+                    ],
+                    action: () => {
+                        const response = voiceActionHandlers.navigateToPage('dashboard');
+                        speakText(response);
+                        return true;
+                    }
+                },
+                // Balance commands
+                {
+                    patterns: [
+                        /^(check|what('s)?|show)\s*(my\s*)?(balance|account\s*balance)$/i,
+                        /^balance$/i,
+                        /^how\s*much\s*money\s*do\s*i\s*have$/i
+                    ],
+                    action: () => {
+                        const response = voiceActionHandlers.checkBalance();
+                        speakText(response);
+                        return true;
+                    }
+                },
+                // Quick recipient list
+                {
+                    patterns: [
+                        /^(who can i send money to|list recipients|show recipients)$/i,
+                        /^recipients$/i
+                    ],
+                    action: () => {
+                        const response = voiceActionHandlers.listRecipients();
+                        speakText(response);
+                        return true;
+                    }
+                }
+            ];
+
+            // Check for direct action patterns first
+            for (const { patterns, action } of directActionPatterns) {
+                if (patterns.some(pattern => pattern.test(cleanText))) {
+                    console.log('✅ Direct action triggered for:', cleanText);
+                    action();
+                    setProcessingCommand(false);
+                    return true;
+                }
             }
 
-            setProcessingCommand(false);
-            return true;
+            // 🤖 COMPLEX REQUESTS - send to AI chat for processing
+            console.log('🤖 Sending to AI chat for processing:', text);
+            injectTextIntoChat(text);
+            speakText("Processing your request");
+
+        } catch (error) {
+            console.error('Voice command error:', error);
+            speakText("Sorry, I couldn't process that. Please try again.");
         }
 
-        return false;
-    }, [speakText, injectTextIntoChat]);
+        setProcessingCommand(false);
+        return true;
+    }, [voiceActionHandlers, speakText, injectTextIntoChat]);
 
     // Handle silence detection for automatic processing
     const handleSilenceDetection = useCallback(() => {
@@ -208,9 +239,7 @@ const CopilotUI = () => {
 
         silenceTimerRef.current = setTimeout(() => {
             if (finalTranscript && finalTranscript !== lastProcessedTranscript) {
-                // Submit ALL voice input directly to chat
                 parseAndExecuteVoiceCommand(finalTranscript);
-
                 setLastProcessedTranscript(finalTranscript);
                 setCommandHistory(prev => [...prev.slice(-4), finalTranscript]);
 
@@ -222,8 +251,8 @@ const CopilotUI = () => {
                     }, 2000);
                 }
             }
-        }, isHandsFreeMode ? 1500 : 3000); // Shorter delay in hands-free mode
-    }, [finalTranscript, lastProcessedTranscript, parseAndExecuteVoiceCommand, isHandsFreeMode, processingCommand, injectTextIntoChat, speakText, resetTranscript]);
+        }, isHandsFreeMode ? 1500 : 3000);
+    }, [finalTranscript, lastProcessedTranscript, parseAndExecuteVoiceCommand, isHandsFreeMode, processingCommand, resetTranscript]);
 
     // Monitor transcript changes for silence detection
     useEffect(() => {
@@ -301,48 +330,37 @@ const CopilotUI = () => {
             <CopilotChat
                 instructions={`You are Quantum Bank AI, a helpful financial assistant with seamless voice input integration.
 
-## 🎤 CRITICAL: USE ACTIONS, DON'T GIVE INSTRUCTIONS
+## 🎤 SMART VOICE ROUTING
+The voice system automatically handles simple commands directly:
+- Navigation ("go to transactions") → Direct routing
+- Balance checks ("check my balance") → Instant response  
+- Quick lists ("show recipients") → Direct data
 
-### MANDATORY ACTION USAGE:
-When users ask for navigation, you MUST use the "navigateToPage" action. DO NOT provide route instructions.
+## 🤖 AI CHAT PROCESSING
+You handle complex requests that need conversation:
+- Money transfers with confirmation
+- Detailed questions about transactions
+- Settings changes
+- Multi-step operations
 
-**Navigation Requests - USE navigateToPage ACTION:**
-- "show me transactions" → CALL navigateToPage with page: "transactions"
-- "go to transactions" → CALL navigateToPage with page: "transactions"  
-- "show settings" → CALL navigateToPage with page: "settings"
-- "go to dashboard" → CALL navigateToPage with page: "dashboard"
+## 🔒 SECURITY-FIRST TRANSFERS
+For money transfers, ALWAYS use the sendMoney action with mandatory confirmation widget.
 
-**Balance Requests - USE checkBalance ACTION:**
-- "check my balance" → CALL checkBalance action
+Examples:
+- "Send €50 to john" → Use sendMoney action (shows confirmation)
+- "Transfer money to alice for dinner" → Use sendMoney action 
+- "I want to send €25" → Ask for recipient, then use sendMoney
 
-**Transfer Requests - USE sendMoney ACTION:**
-- "send €50 to john" → CALL sendMoney action
+## 🎯 Response Style:
+- Execute actions immediately when needed
+- Keep responses conversational and helpful
+- For voice users, be concise but complete
+- Confirm actions taken: "Sending €50 to john - please confirm in the widget"
 
-**Settings - USE toggleSetting ACTION:**
-- "enable dark mode" → CALL toggleSetting action
-
-### 🚫 NEVER DO THIS:
-- Don't say "Please navigate to..." 
-- Don't provide route instructions like "/transactions"
-- Don't explain how to navigate manually
-
-### ✅ ALWAYS DO THIS:
-- Execute the appropriate action immediately
-- Confirm what action was taken
-- Let the action handle the actual work
-
-### 🔒 SECURITY-FIRST TRANSFERS
-ALL money transfers require confirmation via in-chat widget.
-
-### 🎯 Response Style:
-- Execute actions immediately
-- Keep responses short and action-focused
-- Confirm what you're doing: "Navigating to transactions..." then use the action
-
-You are a DO-ER, not an instructor. Use the available actions to fulfill requests directly.`}
+Remember: You work together with the voice system. Simple commands are handled automatically, complex requests come to you.`}
                 labels={{
-                    title: "🎤 Action-Powered Banking AI",
-                    initial: "Hi! I'll execute actions for you. Try 'show me my transactions' or 'check my balance'.",
+                    title: "🎤 Smart Voice + AI Banking",
+                    initial: "Hi! Use voice for quick commands ('go to transactions') or type complex requests.",
                     placeholder: "Type here or use voice commands...",
                 }}
             />
@@ -448,18 +466,27 @@ You are a DO-ER, not an instructor. Use the available actions to fulfill request
                     </div>
                 )}
 
-                {/* Voice Commands Help */}
+                {/* Enhanced Voice Commands Help */}
                 <details className="text-xs text-gray-600">
                     <summary className="cursor-pointer hover:text-gray-800 font-medium">
-                        💡 Voice Input
+                        💡 Voice Commands Guide
                     </summary>
-                    <div className="mt-2 space-y-1 pl-2 border-l-2 border-gray-200">
-                        <div>• Speak naturally - all input goes to AI chat</div>
-                        <div>• "Send €50 to john" - Money transfers</div>
-                        <div>• "Check my balance" - Account info</div>
-                        <div>• "Go to transactions" - Navigation</div>
-                        <div>• "Enable dark mode" - Settings</div>
-                        <div>• Or any other banking question!</div>
+                    <div className="mt-2 space-y-2 pl-2 border-l-2 border-gray-200">
+                        <div className="font-medium text-gray-700">🚀 Quick Commands (Instant):</div>
+                        <div className="space-y-1 text-gray-600">
+                            <div>• "Transactions" → Instant navigation</div>
+                            <div>• "Settings" → Direct to settings</div>
+                            <div>• "Balance" → Immediate balance check</div>
+                            <div>• "Recipients" → Quick recipient list</div>
+                        </div>
+
+                        <div className="font-medium text-gray-700">🤖 AI Processing:</div>
+                        <div className="space-y-1 text-gray-600">
+                            <div>• "Send €50 to john" → Secure transfer with confirmation</div>
+                            <div>• "Show my spending on food" → Detailed analysis</div>
+                            <div>• "Enable dark mode" → Settings changes</div>
+                            <div>• Complex questions → Full AI conversation</div>
+                        </div>
                     </div>
                 </details>
             </div>
