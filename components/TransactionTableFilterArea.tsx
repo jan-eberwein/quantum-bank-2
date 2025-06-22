@@ -48,7 +48,11 @@ const TransactionTableFilterArea: React.FC<Props> = (props) => {
 
     const updateQueryParams = (key: string, value: string) => {
         const params = new URLSearchParams(searchParams?.toString());
-        params.set(key, value);
+        if (value) {
+            params.set(key, value);
+        } else {
+            params.delete(key);
+        }
         params.set("page", "1");
         router.push(`?${params.toString()}`);
     };
@@ -87,21 +91,98 @@ const TransactionTableFilterArea: React.FC<Props> = (props) => {
                         updateQueryParams("transactionType", value);
                         break;
                     case "date": {
+                        // Handle date filter clearing and setting
+                        if (!value || value === "" || value.toLowerCase() === "clear" || value.toLowerCase() === "remove") {
+                            // Clear the date filter
+                            setDateFilter({ from: undefined, to: undefined });
+                            updateQueryParams("date", "");
+                            console.log("✅ Date filter cleared");
+                            break;
+                        }
+
                         /** accept either `YYYY-MM-DD to YYYY-MM-DD` or `fromISO_toISO` */
                         const sep = value.includes(" to ") ? " to " : "_";
                         const [rawFrom, rawTo] = value.split(sep);
+
+                        if (!rawFrom || rawFrom.trim() === "") {
+                            // If no valid from date, clear the filter
+                            setDateFilter({ from: undefined, to: undefined });
+                            updateQueryParams("date", "");
+                            break;
+                        }
+
                         const from = parseISO(rawFrom.trim());
-                        const to = rawTo ? parseISO(rawTo.trim()) : undefined;
-                        if (!isValid(from) || (rawTo && !isValid(to!))) throw new Error("Invalid date(s)");
+                        const to = rawTo && rawTo.trim() ? parseISO(rawTo.trim()) : undefined;
+
+                        if (!isValid(from)) {
+                            console.error("Invalid from date:", rawFrom);
+                            throw new Error(`Invalid from date: ${rawFrom}`);
+                        }
+
+                        if (rawTo && rawTo.trim() && !isValid(to!)) {
+                            console.error("Invalid to date:", rawTo);
+                            throw new Error(`Invalid to date: ${rawTo}`);
+                        }
+
                         setDateFilter({from, to});
                         updateQueryParams("date", `${from.toISOString()}_${to?.toISOString() ?? ""}`);
+                        console.log("✅ Date filter set:", {from, to});
                         break;
                     }
                     default:
                         throw new Error("Unknown filterType");
                 }
+                return `✅ Filter ${filterType} updated successfully`;
             } catch (err) {
-                console.error(err);
+                console.error("Filter update error:", err);
+                return `❌ Failed to update ${filterType} filter: ${err instanceof Error ? err.message : 'Unknown error'}`;
+            }
+        },
+    });
+
+    /* Clear date filter action */
+    useCopilotAction({
+        name: "clearDateFilter",
+        description: "Clear/remove the date filter to show all transactions",
+        parameters: [],
+        handler: async () => {
+            try {
+                setDateFilter({ from: undefined, to: undefined });
+                updateQueryParams("date", "");
+                console.log("✅ Date filter cleared via clearDateFilter action");
+                return "✅ Date filter has been successfully removed. All transactions are now visible.";
+            } catch (err) {
+                console.error("Clear date filter error:", err);
+                return "❌ Failed to clear date filter";
+            }
+        },
+    });
+
+    /* Clear all filters action */
+    useCopilotAction({
+        name: "clearAllFilters",
+        description: "Clear all filters to show all transactions",
+        parameters: [],
+        handler: async () => {
+            try {
+                setSearchQuery("");
+                setSelectedCategory("All Categories");
+                setSelectedStatus("All Statuses");
+                setTransactionType("Incoming & Outgoing");
+                setDateFilter({ from: undefined, to: undefined });
+
+                // Clear URL params
+                updateQueryParams("searchQuery", "");
+                updateQueryParams("category", "");
+                updateQueryParams("status", "");
+                updateQueryParams("transactionType", "");
+                updateQueryParams("date", "");
+
+                console.log("✅ All filters cleared");
+                return "✅ All filters have been cleared. Showing all transactions.";
+            } catch (err) {
+                console.error("Clear all filters error:", err);
+                return "❌ Failed to clear all filters";
             }
         },
     });
@@ -184,7 +265,7 @@ const TransactionTableFilterArea: React.FC<Props> = (props) => {
                         mode="range"
                         selected={{ from: dateFilter.from, to: dateFilter.to }}
                         onSelect={(range: DateRange | undefined) => {
-                            // 1) handle “clear” (range === undefined)
+                            // 1) handle "clear" (range === undefined)
                             if (!range) {
                                 setDateFilter({ from: undefined, to: undefined });
                                 updateQueryParams("date", "");
