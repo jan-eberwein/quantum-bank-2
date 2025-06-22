@@ -5,7 +5,7 @@ import { CopilotChat } from "@copilotkit/react-ui";
 import SpeechRecognition, {
     useSpeechRecognition,
 } from "react-speech-recognition";
-import { Mic, MicOff, Volume2, VolumeX, Zap, MessageSquare } from "lucide-react";
+import { Volume2, VolumeX, Zap, MessageSquare } from "lucide-react";
 
 interface VoiceActionHandlers {
     navigateToPage: (page: string) => string;
@@ -28,8 +28,8 @@ const CopilotUI = ({ voiceActionHandlers }: CopilotUIProps) => {
     } = useSpeechRecognition();
 
     const [micAvailable, setMicAvailable] = useState<boolean | null>(null);
-    const [isHandsFreeMode, setIsHandsFreeMode] = useState(false);
-    const [voiceFeedbackEnabled, setVoiceFeedbackEnabled] = useState(true);
+    const [isVoiceEnabled, setIsVoiceEnabled] = useState(false); // Default to OFF
+    const [aiResponseTTS, setAiResponseTTS] = useState(true); // TTS for AI responses
     const [processingCommand, setProcessingCommand] = useState(false);
     const [lastProcessedTranscript, setLastProcessedTranscript] = useState("");
     const [commandHistory, setCommandHistory] = useState<string[]>([]);
@@ -47,9 +47,9 @@ const CopilotUI = ({ voiceActionHandlers }: CopilotUIProps) => {
             .catch(() => setMicAvailable(false));
     }, []);
 
-    // Voice feedback function
+    // Voice feedback function for direct voice commands
     const speakText = useCallback((text: string) => {
-        if (!voiceFeedbackEnabled || !speechSynthRef.current) return;
+        if (!speechSynthRef.current) return;
 
         speechSynthRef.current.cancel(); // Cancel any ongoing speech
 
@@ -60,7 +60,72 @@ const CopilotUI = ({ voiceActionHandlers }: CopilotUIProps) => {
         utterance.voice = speechSynthRef.current.getVoices().find(v => v.lang.startsWith('en')) || null;
 
         speechSynthRef.current.speak(utterance);
-    }, [voiceFeedbackEnabled]);
+    }, []);
+
+    // Text-to-speech for AI responses
+    const speakAIResponse = useCallback((text: string) => {
+        if (!aiResponseTTS || !speechSynthRef.current) return;
+
+        // Clean up the text (remove markdown, etc.)
+        const cleanText = text
+            .replace(/[#*_`]/g, '') // Remove markdown
+            .replace(/\n+/g, ' ') // Replace newlines with spaces
+            .replace(/\s+/g, ' ') // Normalize whitespace
+            .trim();
+
+        if (!cleanText) return;
+
+        speechSynthRef.current.cancel(); // Cancel any ongoing speech
+
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.rate = 0.9;
+        utterance.pitch = 1;
+        utterance.volume = 0.7; // Slightly quieter for AI responses
+        utterance.voice = speechSynthRef.current.getVoices().find(v => v.lang.startsWith('en')) || null;
+
+        speechSynthRef.current.speak(utterance);
+    }, [aiResponseTTS]);
+
+    // Monitor for new AI messages and read them aloud
+    useEffect(() => {
+        if (!aiResponseTTS) return;
+
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                mutation.addedNodes.forEach((node) => {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        const element = node as Element;
+
+                        // Look for new AI messages in CopilotKit chat
+                        const aiMessages = element.querySelectorAll('[data-role="assistant"], .copilot-message, .ai-message');
+                        aiMessages.forEach((message) => {
+                            const textContent = message.textContent?.trim();
+                            if (textContent && textContent.length > 0) {
+                                // Small delay to ensure the message is fully rendered
+                                setTimeout(() => speakAIResponse(textContent), 500);
+                            }
+                        });
+
+                        // Also check if the node itself is an AI message
+                        if (element.textContent &&
+                            (element.getAttribute('data-role') === 'assistant' ||
+                                element.classList.contains('copilot-message') ||
+                                element.classList.contains('ai-message'))) {
+                            setTimeout(() => speakAIResponse(element.textContent!), 500);
+                        }
+                    }
+                });
+            });
+        });
+
+        // Start observing the document for changes
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+        });
+
+        return () => observer.disconnect();
+    }, [aiResponseTTS, speakAIResponse]);
 
     // React-compatible text injection for AI chat
     const injectTextIntoChat = useCallback((text: string) => {
@@ -243,16 +308,16 @@ const CopilotUI = ({ voiceActionHandlers }: CopilotUIProps) => {
                 setLastProcessedTranscript(finalTranscript);
                 setCommandHistory(prev => [...prev.slice(-4), finalTranscript]);
 
-                // Auto-restart listening in hands-free mode
-                if (isHandsFreeMode && !processingCommand) {
+                // Auto-restart listening when voice is enabled
+                if (isVoiceEnabled && !processingCommand) {
                     setTimeout(() => {
                         resetTranscript();
                         SpeechRecognition.startListening({ continuous: true });
                     }, 2000);
                 }
             }
-        }, isHandsFreeMode ? 1500 : 3000);
-    }, [finalTranscript, lastProcessedTranscript, parseAndExecuteVoiceCommand, isHandsFreeMode, processingCommand, resetTranscript]);
+        }, 1500); // Shorter delay for continuous mode
+    }, [finalTranscript, lastProcessedTranscript, parseAndExecuteVoiceCommand, isVoiceEnabled, processingCommand, resetTranscript]);
 
     // Monitor transcript changes for silence detection
     useEffect(() => {
@@ -268,49 +333,39 @@ const CopilotUI = ({ voiceActionHandlers }: CopilotUIProps) => {
     }, [transcript, listening, handleSilenceDetection]);
 
     // Voice command controls
-    const handleStartListening = () => {
-        resetTranscript();
-        setLastProcessedTranscript("");
-        SpeechRecognition.startListening({
-            continuous: true,
-            language: 'en-US'
-        });
+    const toggleVoice = () => {
+        const newVoiceState = !isVoiceEnabled;
+        setIsVoiceEnabled(newVoiceState);
 
-        if (voiceFeedbackEnabled) {
+        if (newVoiceState) {
+            resetTranscript();
+            setLastProcessedTranscript("");
+            SpeechRecognition.startListening({
+                continuous: true,
+                language: 'en-US'
+            });
             speakText("Voice input activated. How can I help you?");
-        }
-    };
-
-    const handleStopListening = () => {
-        if (silenceTimerRef.current) {
-            clearTimeout(silenceTimerRef.current);
-        }
-        SpeechRecognition.stopListening();
-
-        if (voiceFeedbackEnabled) {
+        } else {
+            if (silenceTimerRef.current) {
+                clearTimeout(silenceTimerRef.current);
+            }
+            SpeechRecognition.stopListening();
             speakText("Voice input stopped.");
         }
     };
 
-    const toggleHandsFreeMode = () => {
-        const newMode = !isHandsFreeMode;
-        setIsHandsFreeMode(newMode);
-
-        if (newMode) {
-            speakText("Hands-free mode activated. I'll listen continuously and auto-execute commands.");
-            handleStartListening();
-        } else {
-            speakText("Hands-free mode deactivated.");
-            handleStopListening();
-        }
-    };
-
-    const toggleVoiceFeedback = () => {
-        const newSetting = !voiceFeedbackEnabled;
-        setVoiceFeedbackEnabled(newSetting);
+    const toggleAIResponseTTS = () => {
+        const newSetting = !aiResponseTTS;
+        setAiResponseTTS(newSetting);
 
         if (newSetting) {
-            speakText("Voice feedback enabled.");
+            speakText("AI response audio enabled.");
+        } else {
+            speakText("AI response audio disabled.");
+            // Cancel any ongoing speech
+            if (speechSynthRef.current) {
+                speechSynthRef.current.cancel();
+            }
         }
     };
 
@@ -328,13 +383,13 @@ const CopilotUI = ({ voiceActionHandlers }: CopilotUIProps) => {
     return (
         <div className="mt-6 bg-white rounded-md p-3 shadow-md border max-h-[500px] overflow-y-auto space-y-3 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100">
             <CopilotChat
-                instructions={`You are Quantum Bank AI, a helpful financial assistant with seamless voice input integration.
+                instructions={`You are Quantum Bank AI, a helpful financial assistant with optional voice input.
 
-## 🎤 SMART VOICE ROUTING
-The voice system automatically handles simple commands directly:
-- Navigation ("go to transactions") → Direct routing
-- Balance checks ("check my balance") → Instant response  
-- Quick lists ("show recipients") → Direct data
+## 🎤 VOICE INPUT (OPTIONAL)
+Voice input is OFF by default. When enabled:
+- Simple commands → Handled directly (navigation, balance checks)
+- Complex requests → Come to you for intelligent processing
+- AI responses can be read aloud automatically
 
 ## 🤖 AI CHAT PROCESSING
 You handle complex requests that need conversation:
@@ -357,11 +412,11 @@ Examples:
 - For voice users, be concise but complete
 - Confirm actions taken: "Sending €50 to john - please confirm in the widget"
 
-Remember: You work together with the voice system. Simple commands are handled automatically, complex requests come to you.`}
+Users can activate voice by clicking "Voice ON" for hands-free interaction.`}
                 labels={{
-                    title: "🎤 Smart Voice + AI Banking",
-                    initial: "Hi! Use voice for quick commands ('go to transactions') or type complex requests.",
-                    placeholder: "Type here or use voice commands...",
+                    title: "🎤 Voice-Optional Banking AI",
+                    initial: "Hi! Type your requests or click 'Voice ON' for hands-free interaction.",
+                    placeholder: "Type here or activate voice for hands-free commands...",
                 }}
             />
 
@@ -370,37 +425,19 @@ Remember: You work together with the voice system. Simple commands are handled a
                 {/* Primary Controls */}
                 <div className="flex items-center gap-2">
                     {isReady ? (
-                        <>
-                            {!isHandsFreeMode ? (
-                                <button
-                                    onClick={listening ? handleStopListening : handleStartListening}
-                                    className={`flex items-center gap-2 px-3 py-2 rounded-md transition-all ${
-                                        listening
-                                            ? 'bg-red-500 text-white shadow-lg animate-pulse'
-                                            : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md'
-                                    }`}
-                                >
-                                    {listening ? <MicOff size={16} /> : <Mic size={16} />}
-                                    <span className="text-sm font-medium">
-                                        {listening ? 'Stop' : 'Voice'}
-                                    </span>
-                                </button>
-                            ) : null}
-
-                            <button
-                                onClick={toggleHandsFreeMode}
-                                className={`flex items-center gap-2 px-3 py-2 rounded-md transition-all ${
-                                    isHandsFreeMode
-                                        ? 'bg-green-500 text-white shadow-lg'
-                                        : 'bg-gray-600 text-white hover:bg-gray-700'
-                                }`}
-                            >
-                                <Zap size={16} />
-                                <span className="text-sm font-medium">
-                                    {isHandsFreeMode ? 'Hands-Free ON' : 'Hands-Free'}
-                                </span>
-                            </button>
-                        </>
+                        <button
+                            onClick={toggleVoice}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-md transition-all ${
+                                isVoiceEnabled
+                                    ? 'bg-green-500 text-white shadow-lg'
+                                    : 'bg-gray-600 text-white hover:bg-gray-700'
+                            }`}
+                        >
+                            <Zap size={16} />
+                            <span className="text-sm font-medium">
+                                {isVoiceEnabled ? 'Voice ON' : 'Voice OFF'}
+                            </span>
+                        </button>
                     ) : (
                         <div className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-md">
                             ❌ Voice unavailable
@@ -412,15 +449,15 @@ Remember: You work together with the voice system. Simple commands are handled a
                 {isReady && (
                     <div className="flex items-center gap-2 text-sm">
                         <button
-                            onClick={toggleVoiceFeedback}
+                            onClick={toggleAIResponseTTS}
                             className={`flex items-center gap-1 px-2 py-1 rounded transition-colors ${
-                                voiceFeedbackEnabled
+                                aiResponseTTS
                                     ? 'bg-blue-100 text-blue-700'
                                     : 'bg-gray-100 text-gray-600'
                             }`}
                         >
-                            {voiceFeedbackEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
-                            Audio
+                            {aiResponseTTS ? <Volume2 size={14} /> : <VolumeX size={14} />}
+                            AI Audio
                         </button>
 
                         <button
@@ -441,7 +478,7 @@ Remember: You work together with the voice system. Simple commands are handled a
                 )}
 
                 {/* Live Transcript Display */}
-                {(listening || isHandsFreeMode) && (transcript || interimTranscript) && (
+                {isVoiceEnabled && (transcript || interimTranscript) && (
                     <div className="bg-blue-50 border border-blue-200 rounded-md p-2">
                         <div className="text-xs text-blue-600 font-medium mb-1">
                             {listening ? '🎤 Listening...' : '⏸️ Processing...'}
@@ -486,6 +523,13 @@ Remember: You work together with the voice system. Simple commands are handled a
                             <div>• "Show my spending on food" → Detailed analysis</div>
                             <div>• "Enable dark mode" → Settings changes</div>
                             <div>• Complex questions → Full AI conversation</div>
+                        </div>
+
+                        <div className="font-medium text-gray-700">🎤 Voice Controls:</div>
+                        <div className="space-y-1 text-gray-600">
+                            <div>• Click "Voice ON" to activate continuous listening</div>
+                            <div>• Pause briefly between commands</div>
+                            <div>• "AI Audio" reads AI responses aloud</div>
                         </div>
                     </div>
                 </details>
