@@ -5,7 +5,7 @@ import { CopilotChat } from "@copilotkit/react-ui";
 import SpeechRecognition, {
     useSpeechRecognition,
 } from "react-speech-recognition";
-import { Zap, MessageSquare } from "lucide-react";
+import { Zap, MessageSquare, Volume2, VolumeX } from "lucide-react";
 
 interface VoiceActionHandlers {
     navigateToPage: (page: string) => string;
@@ -29,6 +29,7 @@ const CopilotUI = ({ voiceActionHandlers }: CopilotUIProps) => {
 
     const [micAvailable, setMicAvailable] = useState<boolean | null>(null);
     const [isVoiceEnabled, setIsVoiceEnabled] = useState(false); // Default to OFF
+    const [isMuted, setIsMuted] = useState(false); // Voice output mute state
     const [processingCommand, setProcessingCommand] = useState(false);
     const [lastProcessedTranscript, setLastProcessedTranscript] = useState("");
     const [commandHistory, setCommandHistory] = useState<string[]>([]);
@@ -48,7 +49,7 @@ const CopilotUI = ({ voiceActionHandlers }: CopilotUIProps) => {
 
     // Voice feedback function for direct voice commands
     const speakText = useCallback((text: string) => {
-        if (!speechSynthRef.current) return;
+        if (!speechSynthRef.current || isMuted) return;
 
         speechSynthRef.current.cancel(); // Cancel any ongoing speech
 
@@ -59,7 +60,7 @@ const CopilotUI = ({ voiceActionHandlers }: CopilotUIProps) => {
         utterance.voice = speechSynthRef.current.getVoices().find(v => v.lang.startsWith('en')) || null;
 
         speechSynthRef.current.speak(utterance);
-    }, []);
+    }, [isMuted]);
 
     // React-compatible text injection for AI chat
     const injectTextIntoChat = useCallback((text: string) => {
@@ -212,6 +213,21 @@ const CopilotUI = ({ voiceActionHandlers }: CopilotUIProps) => {
         }
     };
 
+    const toggleMute = () => {
+        const newMuteState = !isMuted;
+        setIsMuted(newMuteState);
+
+        if (newMuteState) {
+            // Stop any currently playing speech when muting
+            if (speechSynthRef.current) {
+                speechSynthRef.current.cancel();
+            }
+        } else {
+            // Provide audio feedback when unmuting
+            speakText("Voice output enabled.");
+        }
+    };
+
     const handleClear = () => {
         resetTranscript();
         setLastProcessedTranscript("");
@@ -292,6 +308,22 @@ Users can activate voice by clicking "Voice ON" for hands-free interaction.`}
                         </div>
                     )}
 
+                    {/* Mute/Unmute Button */}
+                    <button
+                        onClick={toggleMute}
+                        title={isMuted ? 'Unmute voice output' : 'Mute voice output'}
+                        className={`flex items-center gap-1 px-3 py-2 rounded-md transition-all ${
+                            isMuted
+                                ? 'bg-red-500 text-white hover:bg-red-600'
+                                : 'bg-blue-500 text-white hover:bg-blue-600'
+                        }`}
+                    >
+                        {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                        <span className="text-sm font-medium">
+                            {isMuted ? 'Muted' : 'Audio'}
+                        </span>
+                    </button>
+
                     {isReady && (
                         <button
                             onClick={handleClear}
@@ -322,8 +354,6 @@ Users can activate voice by clicking "Voice ON" for hands-free interaction.`}
                     </div>
                 )}
 
-
-
                 {/* Enhanced Voice Commands Help */}
                 <details className="text-xs text-gray-600">
                     <summary className="cursor-pointer hover:text-gray-800 font-medium">
@@ -345,6 +375,7 @@ Users can activate voice by clicking "Voice ON" for hands-free interaction.`}
                         <div className="font-medium text-gray-700">🎤 Voice Controls:</div>
                         <div className="space-y-1 text-gray-600">
                             <div>• Click "Voice ON" to activate continuous listening</div>
+                            <div>• Click "Audio/Muted" to toggle voice output</div>
                             <div>• All commands are sent to AI for processing</div>
                             <div>• Pause briefly between commands</div>
                             <div>• "Clear" resets voice history and stops speech</div>
