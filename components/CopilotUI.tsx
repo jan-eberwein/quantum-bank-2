@@ -240,9 +240,17 @@ const CopilotUI = ({ voiceActionHandlers }: CopilotUIProps) => {
     const isReady = browserSupportsSpeechRecognition && micAvailable;
 
     return (
-        <div className="mt-6 bg-white rounded-md p-3 shadow-md border max-h-[500px] overflow-y-auto space-y-3 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100">
-            <CopilotChat
-                instructions={`You are Quantum Bank AI, a helpful financial assistant with optional voice input.
+        <div className="mt-3 bg-white rounded-md shadow-md border max-h-[500px] overflow-hidden space-y-0 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100">
+            {/* Sticky Header */}
+            <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 rounded-t-md">
+                <h3 className="text-lg font-semibold text-left" style={{ color: '#000000' }}>Quantum AI Chat</h3>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="p-3 overflow-y-auto max-h-[400px] space-y-3">
+
+                <CopilotChat
+                    instructions={`You are Quantum Bank AI, a helpful financial assistant with optional voice input.
 
 ## 🎤 VOICE INPUT (OPTIONAL)
 Voice input is OFF by default. When enabled, ALL voice commands come to you for processing:
@@ -277,111 +285,114 @@ Examples:
 - Always use actions for navigation, transfers, and settings
 
 Users can activate voice by clicking "Voice ON" for hands-free interaction.`}
-                labels={{
-                    title: "🎤 Voice-Enabled Banking AI",
-                    initial: "Hi! Type your requests or click 'Voice ON' for hands-free interaction.",
-                    placeholder: "Type here or activate voice",
-                }}
-            />
+                    labels={{
+                        title: "🎤 Voice-Enabled Banking AI",
+                        initial: "Hi! Type your requests or click 'Voice ON' for hands-free interaction.",
+                        placeholder: "Type here or activate voice",
+                    }}
+                />
 
-            {/* Voice Control Panel */}
-            <div className="border-t pt-3 space-y-3">
-                {/* Primary Controls */}
-                <div className="flex items-center gap-2">
-                    {isReady ? (
-                        <button
-                            onClick={toggleVoice}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-md transition-all ${
-                                isVoiceEnabled
-                                    ? 'bg-green-500 text-white shadow-lg'
-                                    : 'bg-gray-600 text-white hover:bg-gray-700'
-                            }`}
-                        >
-                            <Zap size={16} />
-                            <span className="text-sm font-medium">
+                {/* Voice Control Panel */}
+                <div className="border-t pt-3 space-y-3">
+                    {/* Primary Controls */}
+                    <div className="flex items-center gap-2">
+                        {isReady ? (
+                            <button
+                                onClick={toggleVoice}
+                                className={`flex items-center gap-2 px-3 py-2 rounded-md transition-all ${
+                                    isVoiceEnabled
+                                        ? 'bg-green-500 text-white shadow-lg'
+                                        : 'bg-gray-600 text-white hover:bg-gray-700'
+                                }`}
+                            >
+                                <Zap size={16} />
+                                <span className="text-sm font-medium">
                                 {isVoiceEnabled ? 'Voice ON' : 'Voice OFF'}
                             </span>
-                        </button>
-                    ) : (
-                        <div className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-md">
-                            ❌ Voice unavailable
-                        </div>
-                    )}
+                            </button>
+                        ) : (
+                            <div className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-md">
+                                ❌ Voice unavailable
+                            </div>
+                        )}
 
-                    {/* Mute/Unmute Button */}
-                    <button
-                        onClick={toggleMute}
-                        title={isMuted ? 'Unmute voice output' : 'Mute voice output'}
-                        className={`flex items-center gap-1 px-3 py-2 rounded-md transition-all ${
-                            isMuted
-                                ? 'bg-red-500 text-white hover:bg-red-600'
-                                : 'bg-blue-500 text-white hover:bg-blue-600'
-                        }`}
-                    >
-                        {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-                        <span className="text-sm font-medium">
+                        {/* Mute/Unmute Button */}
+                        <button
+                            onClick={toggleMute}
+                            title={isMuted ? 'Unmute voice output' : 'Mute voice output'}
+                            className={`flex items-center gap-1 px-3 py-2 rounded-md transition-all ${
+                                isMuted
+                                    ? 'bg-red-500 text-white hover:bg-red-600'
+                                    : 'bg-blue-500 text-white hover:bg-blue-600'
+                            }`}
+                        >
+                            {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                            <span className="text-sm font-medium">
                             {isMuted ? 'Muted' : 'Audio'}
                         </span>
-                    </button>
-
-                    {isReady && (
-                        <button
-                            onClick={handleClear}
-                            className="flex items-center gap-1 px-3 py-2 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors text-sm font-medium"
-                        >
-                            <MessageSquare size={14} />
-                            Clear
                         </button>
-                    )}
 
-                    {processingCommand && (
-                        <div className="flex items-center gap-1 text-blue-600">
-                            <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                            <span className="text-sm">Processing...</span>
+                        {isReady && (
+                            <button
+                                onClick={handleClear}
+                                className="flex items-center gap-1 px-3 py-2 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors text-sm font-medium"
+                            >
+                                <MessageSquare size={14} />
+                                Clear
+                            </button>
+                        )}
+
+                        {processingCommand && (
+                            <div className="flex items-center gap-1 text-blue-600">
+                                <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                <span className="text-sm">Processing...</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Live Transcript Display */}
+                    {isVoiceEnabled && (transcript || interimTranscript) && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-md p-2">
+                            <div className="text-xs text-blue-600 font-medium mb-1">
+                                {listening ? '🎤 Listening...' : '⏸️ Processing...'}
+                            </div>
+                            <div className="text-sm text-blue-800">
+                                "{transcript || interimTranscript}"
+                            </div>
                         </div>
                     )}
+
+
+
+                    {/* Enhanced Voice Commands Help */}
+                    <details className="text-xs text-gray-600">
+                        <summary className="cursor-pointer hover:text-gray-800 font-medium">
+                            💡 Voice Commands Guide
+                        </summary>
+                        <div className="mt-2 space-y-2 pl-2 border-l-2 border-gray-200">
+                            <div className="font-medium text-gray-700">🤖 All Voice Commands:</div>
+                            <div className="space-y-1 text-gray-600">
+                                <div>• "Transactions" → Navigate to transactions page</div>
+                                <div>• "Settings" → Go to account settings</div>
+                                <div>• "Balance" → Check current balance</div>
+                                <div>• "Recipients" → List available users</div>
+                                <div>• "Send €50 to john" → Secure transfer with confirmation</div>
+                                <div>• "Show my spending on food" → Transaction analysis</div>
+                                <div>• "Enable dark mode" → Settings changes</div>
+                                <div>• Any banking question → Full AI conversation</div>
+                            </div>
+
+                            <div className="font-medium text-gray-700">🎤 Voice Controls:</div>
+                            <div className="space-y-1 text-gray-600">
+                                <div>• Click "Voice ON" to activate continuous listening</div>
+                                <div>• Click "Audio/Muted" to toggle voice output</div>
+                                <div>• All commands are sent to AI for processing</div>
+                                <div>• Pause briefly between commands</div>
+                                <div>• "Clear" resets voice history and stops speech</div>
+                            </div>
+                        </div>
+                    </details>
                 </div>
-
-                {/* Live Transcript Display */}
-                {isVoiceEnabled && (transcript || interimTranscript) && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-md p-2">
-                        <div className="text-xs text-blue-600 font-medium mb-1">
-                            {listening ? '🎤 Listening...' : '⏸️ Processing...'}
-                        </div>
-                        <div className="text-sm text-blue-800">
-                            "{transcript || interimTranscript}"
-                        </div>
-                    </div>
-                )}
-
-                {/* Enhanced Voice Commands Help */}
-                <details className="text-xs text-gray-600">
-                    <summary className="cursor-pointer hover:text-gray-800 font-medium">
-                        💡 Voice Commands Guide
-                    </summary>
-                    <div className="mt-2 space-y-2 pl-2 border-l-2 border-gray-200">
-                        <div className="font-medium text-gray-700">🤖 All Voice Commands:</div>
-                        <div className="space-y-1 text-gray-600">
-                            <div>• "Transactions" → Navigate to transactions page</div>
-                            <div>• "Settings" → Go to account settings</div>
-                            <div>• "Balance" → Check current balance</div>
-                            <div>• "Recipients" → List available users</div>
-                            <div>• "Send €50 to john" → Secure transfer with confirmation</div>
-                            <div>• "Show my spending on food" → Transaction analysis</div>
-                            <div>• "Enable dark mode" → Settings changes</div>
-                            <div>• Any banking question → Full AI conversation</div>
-                        </div>
-
-                        <div className="font-medium text-gray-700">🎤 Voice Controls:</div>
-                        <div className="space-y-1 text-gray-600">
-                            <div>• Click "Voice ON" to activate continuous listening</div>
-                            <div>• Click "Audio/Muted" to toggle voice output</div>
-                            <div>• All commands are sent to AI for processing</div>
-                            <div>• Pause briefly between commands</div>
-                            <div>• "Clear" resets voice history and stops speech</div>
-                        </div>
-                    </div>
-                </details>
             </div>
         </div>
     );
