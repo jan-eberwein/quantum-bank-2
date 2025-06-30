@@ -279,8 +279,8 @@ Examples:
 Users can activate voice by clicking "Voice ON" for hands-free interaction.`}
                 labels={{
                     title: "🎤 Voice-Enabled Banking AI",
-                    initial: "Hi! Type your requests or click 'Voice ON' for hands-free interaction. All voice commands are processed by AI.",
-                    placeholder: "Type here or activate voice - all commands go through AI...",
+                    initial: "Hi! Type your requests or click 'Voice ON' for hands-free interaction.",
+                    placeholder: "Type here or activate voice",
                 }}
             />
 
