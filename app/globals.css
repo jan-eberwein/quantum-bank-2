@@ -118,7 +118,7 @@
   }
 
   .total-balance {
-    @apply flex w-full items-center gap-4 rounded-xl border border-gray-200 p-4 shadow-chart sm:gap-6 sm:p-6;
+    @apply flex w-full items-center gap-4 rounded-lg border border-gray-200 p-4 shadow-md sm:gap-6 sm:p-6;
   }
 
   .total-balance-chart {
@@ -372,7 +372,7 @@
   .sidebar {
     @apply sticky left-0 top-0 flex h-screen flex-col justify-between border-r border-gray-200 bg-white text-white sm:p-4 xl:p-6;
     @apply transition-all duration-300; /* Smooth transition for resizing */
-     @apply w-[550px] flex flex-col justify-between bg-white h-screen overflow-hidden;
+    @apply w-[550px] flex flex-col justify-between bg-white h-screen overflow-hidden;
   }
 
   .sidebar-logo {
