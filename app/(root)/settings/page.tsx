@@ -210,10 +210,10 @@ const SettingsPage = () => {
                 </div>
             </section>
 
-            <hr className="border-gray-300" />
+            {/*<hr className="border-gray-300" />*/}
 
             {/* Account Settings */}
-            <section className="space-y-4">
+            {/*<section className="space-y-4">
                 <h3 className="text-2xl font-semibold">Account Settings</h3>
                 <div className="border p-4 rounded-md flex justify-between items-center">
                     <div>
@@ -230,7 +230,7 @@ const SettingsPage = () => {
                         {settings.darkMode ? "Enabled" : "Disabled"}
                     </button>
                 </div>
-            </section>
+            </section>*/}
 
             <hr className="border-gray-300" />
 
