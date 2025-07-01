@@ -191,10 +191,16 @@ const SimpleMoneyTransfer: React.FC<SimpleMoneyTransferProps> = ({
                         setState((prev) => ({ ...prev, selectedUserId: value }))
                     }
                 >
-                  <SelectTrigger className="mt-1 bg-white border border-gray-300 rounded-lg">
-                    <SelectValue placeholder="Select recipient" />
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select recipient">
+                      {selectedUser && (
+                          <span className="truncate">
+                          {selectedUser.userId} ({selectedUser.email})
+                        </span>
+                      )}
+                    </SelectValue>
                   </SelectTrigger>
-                  <SelectContent className="bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                  <SelectContent className="bg-white shadow-lg z-50 max-h-60 overflow-y-auto">
                     {availableUsers.map((user) => (
                         <SelectItem
                             key={user.$id}

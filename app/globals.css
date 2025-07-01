@@ -541,11 +541,11 @@ select {
 }
 
 .rdp-day--selected,
-[aria-selected="true"],
-.day-range-start,
-.day-range-middle,
-.day-range-end {
-  background-color: #007bff !important; /* your brand blue */
+.rdp-day[aria-selected="true"],
+.rdp-day.day-range-start,
+.rdp-day.day-range-middle,
+.rdp-day.day-range-end {
+  background-color: #007bff !important;
   color: #fff !important;
   border-radius: 4px !important;
 }
@@ -556,7 +556,7 @@ select {
   border-radius: 4px !important;
 }
 
-[aria-selected="true"]:hover {
+.rdp-day[aria-selected="true"]:hover {
   background-color: #0056b3 !important;
   color: #fff !important;
 }
