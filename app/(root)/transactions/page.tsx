@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { parseISO, isValid, startOfDay, endOfDay } from 'date-fns';
 import HeaderBox from '@/components/HeaderBox';
 import { Pagination } from '@/components/Pagination';
 import TransactionTable from '@/components/TransactionTable';
@@ -12,6 +13,7 @@ import useTransactions from '@/hooks/useTransactions';
 import useTransactionStatuses from '@/hooks/useTransactionStatuses';
 import useTransactionCategories from '@/hooks/useTransactionCategories';
 import { Transaction } from '@/types/Transaction';
+import { DateRange } from 'react-day-picker';
 
 const ROWS_PER_PAGE = 14;
 
@@ -27,18 +29,34 @@ export default function TransactionsPage() {
   const initialStatus = searchParams.get('status') || 'All Statuses';
   const initialTransactionType = searchParams.get('transactionType') || 'Incoming & Outgoing';
 
+  const initialDateFilter = useMemo(() => {
+    const dateParam = searchParams.get('date');
+    if (!dateParam) return { from: undefined, to: undefined };
+    const [fromStr, toStr] = dateParam.split('_');
+    const from = fromStr ? parseISO(fromStr) : undefined;
+    const to = toStr ? parseISO(toStr) : undefined;
+
+    if (isValid(from)) {
+      return { from, to: isValid(to) ? to : undefined };
+    }
+    return { from: undefined, to: undefined };
+  }, [searchParams]);
+
   const { user, loading: userLoading } = useUser();
   const { transactions, loading: txLoading } = useTransactions(user?.$id);
   const { statuses, loading: statusLoading } = useTransactionStatuses();
   const { categories, loading: catLoading } = useTransactionCategories();
 
-  // UI state
+  // UI state initialized with values from URL
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
   const [selectedStatus, setSelectedStatus] = useState(initialStatus);
   const [transactionType, setTransactionType] = useState(initialTransactionType);
-  const [dateFilter, setDateFilter] = useState<{ from?: Date; to?: Date }>({});
-  const [hasSearched, setHasSearched] = useState(false);
+  const [dateFilter, setDateFilter] = useState<DateRange>(initialDateFilter);
+  const [hasSearched, setHasSearched] = useState(
+      !!initialSearchQuery || !!initialCategory || !!initialStatus || !!initialTransactionType || !!initialDateFilter.from
+  );
+
 
   // Update URL params helper
   const updateQueryParams = (key: string, val: string) => {
@@ -54,72 +72,64 @@ export default function TransactionsPage() {
 
   // Available filter options
   const availableCategories = useMemo(
-    () => ['All Categories', ...categories.map(cat => cat.name)],
-    [categories]
+      () => ['All Categories', ...categories.map(cat => cat.name)],
+      [categories]
   );
   const availableStatuses = useMemo(
-    () => ['All Statuses', ...statuses.map(status => status.name)],
-    [statuses]
+      () => ['All Statuses', ...statuses.map(status => status.name)],
+      [statuses]
   );
 
   // Create lookup maps for filtering
   const categoryIdMap = useMemo(
-    () => new Map(categories.map(cat => [cat.name, cat.$id])),
-    [categories]
+      () => new Map(categories.map(cat => [cat.name, cat.$id])),
+      [categories]
   );
   const statusIdMap = useMemo(
-    () => new Map(statuses.map(status => [status.name, status.$id])),
-    [statuses]
+      () => new Map(statuses.map(status => [status.name, status.$id])),
+      [statuses]
   );
 
   // Filter transactions
   const filtered = useMemo(() => {
     return transactions
-      .filter((t) => {
-        // Transaction type filter
-        if (transactionType === 'incoming') return t.amount > 0;
-        if (transactionType === 'outgoing') return t.amount < 0;
-        return true; // 'Incoming & Outgoing'
-      })
-      .filter((t) => {
-        // Status filter
-        if (selectedStatus === 'All Statuses') return true;
-        const statusId = statusIdMap.get(selectedStatus);
-        return statusId ? t.transactionStatusId === statusId : false;
-      })
-      .filter((t) => {
-        // Category filter
-        if (selectedCategory === 'All Categories') return true;
-        const categoryId = categoryIdMap.get(selectedCategory);
-        return categoryId ? t.transactionCategoryId === categoryId : false;
-      })
-      .filter((t) => {
-        // Search query filter
-        if (!searchQuery) return true;
-        const searchLower = searchQuery.toLowerCase();
-        return (
-          t.merchant.toLowerCase().includes(searchLower) ||
-          (t.description && t.description.toLowerCase().includes(searchLower))
-        );
-      })
-      .filter((t) => {
-        // Date filter
-        if (!dateFilter.from && !dateFilter.to) return true;
-        const transactionDate = new Date(t.createdAt);
+        .filter((t) => {
+          // Transaction type filter
+          if (transactionType === 'incoming') return t.amount > 0;
+          if (transactionType === 'outgoing') return t.amount < 0;
+          return true; // 'Incoming & Outgoing'
+        })
+        .filter((t) => {
+          // Status filter
+          if (selectedStatus === 'All Statuses') return true;
+          const statusId = statusIdMap.get(selectedStatus);
+          return statusId ? t.transactionStatusId === statusId : false;
+        })
+        .filter((t) => {
+          // Category filter
+          if (selectedCategory === 'All Categories') return true;
+          const categoryId = categoryIdMap.get(selectedCategory);
+          return categoryId ? t.transactionCategoryId === categoryId : false;
+        })
+        .filter((t) => {
+          // Search query filter
+          if (!searchQuery) return true;
+          const searchLower = searchQuery.toLowerCase();
+          return (
+              t.merchant.toLowerCase().includes(searchLower) ||
+              (t.description && t.description.toLowerCase().includes(searchLower))
+          );
+        })
+        .filter((t) => {
+          // Date filter
+          if (!dateFilter.from) return true;
 
-        if (dateFilter.from && dateFilter.to) {
-          return (
-            transactionDate >= dateFilter.from &&
-            transactionDate <= dateFilter.to
-          );
-        }
-        if (dateFilter.from) {
-          return (
-            transactionDate.toDateString() === dateFilter.from.toDateString()
-          );
-        }
-        return true;
-      });
+          const transactionDate = new Date(t.createdAt);
+          const fromDate = startOfDay(dateFilter.from);
+          const toDate = dateFilter.to ? endOfDay(dateFilter.to) : endOfDay(dateFilter.from);
+
+          return transactionDate >= fromDate && transactionDate <= toDate;
+        });
   }, [
     transactions,
     transactionType,
@@ -135,8 +145,8 @@ export default function TransactionsPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / ROWS_PER_PAGE));
   const sliceStart = (currentPage - 1) * ROWS_PER_PAGE;
   const currentRows = filtered.slice(
-    sliceStart,
-    sliceStart + ROWS_PER_PAGE
+      sliceStart,
+      sliceStart + ROWS_PER_PAGE
   );
 
   // Copilot readable data
@@ -149,112 +159,107 @@ export default function TransactionsPage() {
     value: filtered,
   });
 
-  // ** Ladespinner-Zustand **
   if (userLoading || txLoading || statusLoading || catLoading) {
     return (
-      // Wichtig: "flex-1" sichert ab, dass dieser Container
-      // wirklich die gesamte Höhe des Content-Bereichs einnimmt
-      // und damit zentriert neben der Sidebar steht.
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-          <p className="text-gray-600">Loading transactions...</p>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+            <p className="text-gray-600">Loading transactions...</p>
+          </div>
         </div>
-      </div>
     );
   }
 
-  // ** Normaler Inhalt **
   return (
-    <div className="p-6">
-      <HeaderBox
-        title="Transactions"
-        subtext="Manage and view your transaction history"
-      />
-
-      <div className="transaction-filter-wrapper mt-6">
-        <TransactionTableFilterArea
-          searchQuery={searchQuery}
-          setSearchQuery={(v) => {
-            setSearchQuery(v);
-            setHasSearched(true);
-            updateQueryParams('searchQuery', v);
-          }}
-          selectedCategory={selectedCategory}
-          setSelectedCategory={(v) => {
-            setSelectedCategory(v);
-            setHasSearched(true);
-            updateQueryParams(
-              'category',
-              v === 'All Categories' ? '' : v
-            );
-          }}
-          availableCategories={availableCategories}
-          dateFilter={dateFilter}
-          setDateFilter={(range) => {
-            setDateFilter(range);
-            setHasSearched(true);
-            const dateParam =
-              range.from && range.to
-                ? `${range.from.toISOString()}_${range.to.toISOString()}`
-                : range.from
-                ? range.from.toISOString()
-                : '';
-            updateQueryParams('date', dateParam);
-          }}
-          selectedStatus={selectedStatus}
-          setSelectedStatus={(v) => {
-            setSelectedStatus(v);
-            setHasSearched(true);
-            updateQueryParams(
-              'status',
-              v === 'All Statuses' ? '' : v
-            );
-          }}
-          availableStatuses={availableStatuses}
-          transactionType={transactionType}
-          setTransactionType={(v) => {
-            setTransactionType(v);
-            setHasSearched(true);
-            updateQueryParams(
-              'transactionType',
-              v === 'Incoming & Outgoing' ? '' : v
-            );
-          }}
-          availableTransactionTypes={[
-            'Incoming & Outgoing',
-            'incoming',
-            'outgoing',
-          ]}
+      <div className="p-6">
+        <HeaderBox
+            title="Transactions"
+            subtext="Manage and view your transaction history"
         />
-      </div>
 
-      <section className="mt-6 flex flex-col gap-6">
-        {filtered.length === 0 && hasSearched ? (
-          <div className="text-center py-12">
-            <div className="text-gray-500 mb-2">No transactions found</div>
-            <p className="text-sm text-gray-400">
-              Try adjusting your filters to see more results.
-            </p>
-          </div>
-        ) : (
-          <>
-            <div className="bg-white rounded-lg shadow-sm border">
-              <TransactionTable
-                transactions={currentRows as Transaction[]}
-                categories={categories}
-                statuses={statuses}
-              />
-            </div>
+        <div className="transaction-filter-wrapper mt-6">
+          <TransactionTableFilterArea
+              searchQuery={searchQuery}
+              setSearchQuery={(v) => {
+                setSearchQuery(v);
+                setHasSearched(true);
+                updateQueryParams('searchQuery', v);
+              }}
+              selectedCategory={selectedCategory}
+              setSelectedCategory={(v) => {
+                setSelectedCategory(v);
+                setHasSearched(true);
+                updateQueryParams(
+                    'category',
+                    v === 'All Categories' ? '' : v
+                );
+              }}
+              availableCategories={availableCategories}
+              dateFilter={dateFilter}
+              setDateFilter={(range) => {
+                setDateFilter(range);
+                setHasSearched(true);
+                const dateParam =
+                    range.from && range.to
+                        ? `${range.from.toISOString()}_${range.to.toISOString()}`
+                        : range.from
+                            ? range.from.toISOString()
+                            : '';
+                updateQueryParams('date', dateParam);
+              }}
+              selectedStatus={selectedStatus}
+              setSelectedStatus={(v) => {
+                setSelectedStatus(v);
+                setHasSearched(true);
+                updateQueryParams(
+                    'status',
+                    v === 'All Statuses' ? '' : v
+                );
+              }}
+              availableStatuses={availableStatuses}
+              transactionType={transactionType}
+              setTransactionType={(v) => {
+                setTransactionType(v);
+                setHasSearched(true);
+                updateQueryParams(
+                    'transactionType',
+                    v === 'Incoming & Outgoing' ? '' : v
+                );
+              }}
+              availableTransactionTypes={[
+                'Incoming & Outgoing',
+                'incoming',
+                'outgoing',
+              ]}
+          />
+        </div>
 
-            {totalPages > 1 && (
-              <div className="flex justify-center">
-                <Pagination page={currentPage} totalPages={totalPages} />
+        <section className="mt-6 flex flex-col gap-6">
+          {filtered.length === 0 && hasSearched ? (
+              <div className="text-center py-12">
+                <div className="text-gray-500 mb-2">No transactions found</div>
+                <p className="text-sm text-gray-400">
+                  Try adjusting your filters to see more results.
+                </p>
               </div>
-            )}
-          </>
-        )}
-      </section>
-    </div>
+          ) : (
+              <>
+                <div className="bg-white rounded-lg shadow-sm border">
+                  <TransactionTable
+                      transactions={currentRows as Transaction[]}
+                      categories={categories}
+                      statuses={statuses}
+                  />
+                </div>
+
+                {totalPages > 1 && (
+                    <div className="flex justify-center">
+                      <Pagination page={currentPage} totalPages={totalPages} />
+                    </div>
+                )}
+              </>
+          )}
+        </section>
+      </div>
   );
 }

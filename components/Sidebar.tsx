@@ -1,4 +1,3 @@
-// components/Sidebar.tsx
 "use client";
 
 import React from "react";
@@ -267,34 +266,6 @@ const Sidebar = ({ user: userProp }: SidebarProps) => {
         default:
           return `❌ Unknown page: ${page}. Available pages: transactions, settings, dashboard`;
       }
-    },
-  });
-
-  useCopilotAction({
-    name: "viewTransactions",
-    description: "Navigate to the transactions page to view recent transfers",
-    parameters: [
-      {
-        name: "filterType",
-        type: "string",
-        description: "Optional filter: 'incoming', 'outgoing', or 'all'",
-        required: false,
-      },
-    ],
-    handler: async ({ filterType }) => {
-      const params = new URLSearchParams();
-
-      if (filterType === "incoming") {
-        params.set("transactionType", "incoming");
-      } else if (filterType === "outgoing") {
-        params.set("transactionType", "outgoing");
-      }
-
-      const queryString = params.toString();
-      const url = queryString ? `/transactions?${queryString}` : "/transactions";
-
-      router.push(url);
-      return `🧭 Navigating to transactions page${filterType ? ` (showing ${filterType} transfers)` : ""}...`;
     },
   });
 

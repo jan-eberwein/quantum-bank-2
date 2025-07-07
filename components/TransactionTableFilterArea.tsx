@@ -1,18 +1,18 @@
 "use client";
 
 import React from "react";
-import {format, parseISO, isValid} from "date-fns";
+import { format, parseISO, isValid, startOfDay, endOfDay } from "date-fns";
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
-import {Calendar} from "@/components/ui/calendar";
-import {Button} from "@/components/ui/button";
-import {CalendarIcon} from "lucide-react";
-import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
-import {cn} from "@/lib/utils";
-import {useCopilotAction, useCopilotReadable} from "@copilotkit/react-core";
-import {useRouter, useSearchParams} from "next/navigation";
-import {DateRange} from "react-day-picker";
+import { Calendar } from "@/components/ui/calendar";
+import { Button } from "@/components/ui/button";
+import { CalendarIcon } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { useCopilotAction, useCopilotReadable } from "@copilotkit/react-core";
+import { useRouter, useSearchParams } from "next/navigation";
+import { DateRange } from "react-day-picker";
 
 interface Props {
     searchQuery: string;
@@ -23,7 +23,7 @@ interface Props {
     availableCategories: string[];
 
     dateFilter: { from?: Date; to?: Date };
-    setDateFilter: (v: { from?: Date; to?: Date }) => void;
+    setDateFilter: (v: DateRange) => void;
 
     selectedStatus: string;
     setSelectedStatus: (v: string) => void;
@@ -43,92 +43,56 @@ const TransactionTableFilterArea: React.FC<Props> = (props) => {
         transactionType, setTransactionType, availableTransactionTypes
     } = props;
 
-    const router = useRouter();
-    const searchParams = useSearchParams();
-
-    const updateQueryParams = (key: string, value: string) => {
-        const params = new URLSearchParams(searchParams?.toString());
-        if (value) {
-            params.set(key, value);
-        } else {
-            params.delete(key);
-        }
-        params.set("page", "1");
-        router.push(`?${params.toString()}`);
-    };
-
-    /* ── Copilot exposure ─────────────────────────────── */
+    /* ── Copilot Actions ────────────────────────────────────────── */
     useCopilotReadable({
         description: "Current transaction table filters",
         value: {searchQuery, selectedCategory, selectedStatus, dateFilter, transactionType},
     });
 
-    /* Allow Copilot to change filters programmatically */
     useCopilotAction({
         name: "updateFilters",
-        description: "Update one of the transaction filters",
+        description: "Update a transaction filter (searchQuery, category, status, or transactionType). For dates, use the setDateFilterRange action instead.",
         parameters: [
-            {name: "filterType", type: "string", required: true},
-            {name: "value", type: "string", required: true},
+            {
+                name: "filterType",
+                type: "string",
+                description: "The type of filter to update. MUST be one of the following exact values: 'searchQuery', 'category', 'status', 'transactionType'.",
+                required: true,
+            },
+            {
+                name: "value",
+                type: "string",
+                description: "The new value for the selected filter.",
+                required: true,
+            },
         ],
         handler: async ({filterType, value}) => {
             try {
+                if (typeof value !== 'string') {
+                    console.error("Filter update error: received non-string value for filter", { filterType, value });
+                    return `❌ Failed to update filter. The provided value was not in the correct text format.`;
+                }
+
                 switch (filterType) {
                     case "searchQuery":
                         setSearchQuery(value);
-                        updateQueryParams("searchQuery", value);
                         break;
                     case "category":
                         setSelectedCategory(value);
-                        updateQueryParams("category", value);
                         break;
                     case "status":
                         setSelectedStatus(value);
-                        updateQueryParams("status", value);
                         break;
                     case "transactionType":
-                        setTransactionType(value);
-                        updateQueryParams("transactionType", value);
-                        break;
-                    case "date": {
-                        // Handle date filter clearing and setting
-                        if (!value || value === "" || value.toLowerCase() === "clear" || value.toLowerCase() === "remove") {
-                            // Clear the date filter
-                            setDateFilter({ from: undefined, to: undefined });
-                            updateQueryParams("date", "");
-                            console.log("✅ Date filter cleared");
-                            break;
+                    {
+                        const lowerValue = value.toLowerCase();
+                        if (lowerValue === 'incoming' || lowerValue === 'outgoing') {
+                            setTransactionType(lowerValue);
+                        } else {
+                            setTransactionType('Incoming & Outgoing');
                         }
-
-                        /** accept either `YYYY-MM-DD to YYYY-MM-DD` or `fromISO_toISO` */
-                        const sep = value.includes(" to ") ? " to " : "_";
-                        const [rawFrom, rawTo] = value.split(sep);
-
-                        if (!rawFrom || rawFrom.trim() === "") {
-                            // If no valid from date, clear the filter
-                            setDateFilter({ from: undefined, to: undefined });
-                            updateQueryParams("date", "");
-                            break;
-                        }
-
-                        const from = parseISO(rawFrom.trim());
-                        const to = rawTo && rawTo.trim() ? parseISO(rawTo.trim()) : undefined;
-
-                        if (!isValid(from)) {
-                            console.error("Invalid from date:", rawFrom);
-                            throw new Error(`Invalid from date: ${rawFrom}`);
-                        }
-
-                        if (rawTo && rawTo.trim() && !isValid(to!)) {
-                            console.error("Invalid to date:", rawTo);
-                            throw new Error(`Invalid to date: ${rawTo}`);
-                        }
-
-                        setDateFilter({from, to});
-                        updateQueryParams("date", `${from.toISOString()}_${to?.toISOString() ?? ""}`);
-                        console.log("✅ Date filter set:", {from, to});
-                        break;
                     }
+                        break;
                     default:
                         throw new Error("Unknown filterType");
                 }
@@ -140,23 +104,45 @@ const TransactionTableFilterArea: React.FC<Props> = (props) => {
         },
     });
 
-    /* Clear date filter action */
     useCopilotAction({
-        name: "clearDateFilter",
-        description: "Clear/remove the date filter to show all transactions",
-        parameters: [],
-        handler: async () => {
+        name: "setDateFilterRange",
+        description: "Set a date range filter for transactions. Use this for requests like 'show transactions from last month' or 'show transactions in May 2025'.",
+        parameters: [
+            {
+                name: "fromDate",
+                type: "string",
+                description: "The start date of the range in yyyy-MM-dd format.",
+                required: true,
+            },
+            {
+                name: "toDate",
+                type: "string",
+                description: "The end date of the range in yyyy-MM-dd format.",
+                required: true,
+            },
+        ],
+        handler: async ({ fromDate, toDate }) => {
             try {
-                setDateFilter({ from: undefined, to: undefined });
-                updateQueryParams("date", "");
-                console.log("✅ Date filter cleared via clearDateFilter action");
-                return "✅ Date filter has been successfully removed. All transactions are now visible.";
+                const from = startOfDay(parseISO(fromDate));
+                const to = endOfDay(parseISO(toDate));
+
+                if (!isValid(from) || !isValid(to)) {
+                    throw new Error("Invalid date format provided. Please use yyyy-MM-dd.");
+                }
+
+                if (from > to) {
+                    throw new Error("The start date cannot be after the end date.");
+                }
+
+                setDateFilter({ from, to });
+                return "✅ Date filter set successfully.";
             } catch (err) {
-                console.error("Clear date filter error:", err);
-                return "❌ Failed to clear date filter";
+                console.error("Set date filter error:", err);
+                return `❌ Failed to set date filter: ${err instanceof Error ? err.message : 'Unknown error'}`;
             }
         },
     });
+
 
     /* Clear all filters action */
     useCopilotAction({
@@ -170,16 +156,7 @@ const TransactionTableFilterArea: React.FC<Props> = (props) => {
                 setSelectedStatus("All Statuses");
                 setTransactionType("Incoming & Outgoing");
                 setDateFilter({ from: undefined, to: undefined });
-
-                // Clear URL params
-                updateQueryParams("searchQuery", "");
-                updateQueryParams("category", "");
-                updateQueryParams("status", "");
-                updateQueryParams("transactionType", "");
-                updateQueryParams("date", "");
-
-                console.log("✅ All filters cleared");
-                return "✅ All filters have been cleared. Showing all transactions.";
+                return "✅ All filters have been cleared.";
             } catch (err) {
                 console.error("Clear all filters error:", err);
                 return "❌ Failed to clear all filters";
@@ -195,20 +172,14 @@ const TransactionTableFilterArea: React.FC<Props> = (props) => {
                 type="text"
                 placeholder="Search transactions"
                 value={searchQuery}
-                onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    updateQueryParams("searchQuery", e.target.value);
-                }}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-[250px] rounded-lg border border-gray-300 px-3 py-2"
             />
 
             {/* Category */}
-            <Select onValueChange={(v) => {
-                setSelectedCategory(v);
-                updateQueryParams("category", v);
-            }}>
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                 <SelectTrigger className="w-[250px] bg-white text-black border border-gray-300 rounded-lg">
-                    <SelectValue placeholder={selectedCategory || "All Categories"}/>
+                    <SelectValue placeholder="All Categories"/>
                 </SelectTrigger>
                 <SelectContent className="bg-white text-black border border-gray-300 rounded-lg">
                     {availableCategories.map(cat => (
@@ -218,12 +189,9 @@ const TransactionTableFilterArea: React.FC<Props> = (props) => {
             </Select>
 
             {/* Transaction type */}
-            <Select onValueChange={(v) => {
-                setTransactionType(v);
-                updateQueryParams("transactionType", v);
-            }}>
+            <Select value={transactionType} onValueChange={setTransactionType}>
                 <SelectTrigger className="w-[250px] bg-white text-black border border-gray-300 rounded-lg">
-                    <SelectValue placeholder={transactionType}/>
+                    <SelectValue placeholder="Incoming & Outgoing"/>
                 </SelectTrigger>
                 <SelectContent className="bg-white text-black border border-gray-300 rounded-lg">
                     {availableTransactionTypes.map(t => (
@@ -233,12 +201,9 @@ const TransactionTableFilterArea: React.FC<Props> = (props) => {
             </Select>
 
             {/* Status */}
-            <Select onValueChange={(v) => {
-                setSelectedStatus(v);
-                updateQueryParams("status", v);
-            }}>
+            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
                 <SelectTrigger className="w-[250px] bg-white text-black border border-gray-300 rounded-lg">
-                    <SelectValue placeholder={selectedStatus}/>
+                    <SelectValue placeholder="All Statuses"/>
                 </SelectTrigger>
                 <SelectContent className="bg-white text-black border border-gray-300 rounded-lg">
                     {availableStatuses.map(s => (
@@ -254,6 +219,7 @@ const TransactionTableFilterArea: React.FC<Props> = (props) => {
                             className="w-[250px] justify-start bg-white text-black border border-gray-300 rounded-lg">
                         {dateFilter.from
                             ? dateFilter.to
+                                // --- FIX: Corrected date format from "évidence" to "yyyy" ---
                                 ? `${format(dateFilter.from, "MMM dd, yyyy")} - ${format(dateFilter.to, "MMM dd, yyyy")}`
                                 : format(dateFilter.from, "MMM dd, yyyy")
                             : "Select Date"}
@@ -263,24 +229,8 @@ const TransactionTableFilterArea: React.FC<Props> = (props) => {
                 <PopoverContent className={cn("w-auto p-0 bg-white border border-gray-300 rounded-lg")} align="start">
                     <Calendar
                         mode="range"
-                        selected={{ from: dateFilter.from, to: dateFilter.to }}
-                        onSelect={(range: DateRange | undefined) => {
-                            // 1) handle "clear" (range === undefined)
-                            if (!range) {
-                                setDateFilter({ from: undefined, to: undefined });
-                                updateQueryParams("date", "");
-                                return;
-                            }
-
-                            // 2) proper non-undefined range
-                            setDateFilter({ from: range.from, to: range.to });
-
-                            // 3) update the URL
-                            updateQueryParams(
-                                "date",
-                                `${range.from?.toISOString() ?? ""}_${range.to?.toISOString() ?? ""}`
-                            );
-                        }}
+                        selected={dateFilter as DateRange}
+                        onSelect={(range) => setDateFilter(range || { from: undefined, to: undefined })}
                         numberOfMonths={1}
                         initialFocus
                     />
