@@ -1,5 +1,4 @@
 "use client";
-// client/components/DynamicChart.tsx
 import React from "react";
 import {
   Radar,
@@ -25,7 +24,6 @@ import {
   Filler,
 } from "chart.js";
 
-// Register necessary Chart.js components
 ChartJS.register(
   RadialLinearScale,
   ArcElement,

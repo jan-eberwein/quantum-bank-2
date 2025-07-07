@@ -1,4 +1,3 @@
-// lib/copilot-transfer-actions.ts
 "use client";
 
 import { useCopilotAction, useCopilotReadable } from "@copilotkit/react-core";

@@ -21,15 +21,12 @@ export function useProfileImageUpload() {
         setError(null);
 
         try {
-            // 1) Upload to Appwrite storage
             const created = await storage.createFile(
                 BUCKET_ID,
                 ID.unique(),
                 file
             );
-            // 2) Persist fileId to user document
             await updateUserDocument(user.$id, { profileImageId: created.$id });
-            // 3) Refresh context so UI updates
             await refreshUser();
         } catch (err: any) {
             console.error("Upload error:", err);

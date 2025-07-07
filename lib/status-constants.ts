@@ -1,6 +1,3 @@
-// lib/status-constants.ts
-// Centralized status constants using environment variables
-
 /**
  * Unified status IDs from the TransactionStatuses collection
  * These are used for both transactions and transfers

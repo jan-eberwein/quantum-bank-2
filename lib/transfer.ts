@@ -1,10 +1,6 @@
-// lib/transfer.ts
 import { database, ID } from "@/lib/appwrite";
 import { Query } from "appwrite";
 
-/* ------------------------------------------------------------------ */
-/*  Helper: Recompute a user’s balance from all their transactions    */
-/* ------------------------------------------------------------------ */
 export async function syncUserBalance(userId: string): Promise<number> {
   if (!userId) return 0;
 
@@ -14,7 +10,6 @@ export async function syncUserBalance(userId: string): Promise<number> {
     [Query.equal("userId", userId), Query.limit(1000)]
   );
 
-  // Use 'any' here for tx typing if you're unsure of the document structure
   const newBalance = txRes.documents.reduce(
     (sum: number, tx: any) => sum + (tx.amount ?? 0),
     0
@@ -30,9 +25,6 @@ export async function syncUserBalance(userId: string): Promise<number> {
   return newBalance;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Transfer Service class                                            */
-/* ------------------------------------------------------------------ */
 export interface TransferData {
   senderUserId: string;
   receiverUserId: string;
@@ -64,7 +56,7 @@ export class TransferService {
         return { success: false, error: "Cannot transfer money to yourself" };
       }
 
-      // ✅ Check current up-to-date balance
+      // Check current up-to-date balance
       const liveSenderBalance = await syncUserBalance(transferData.senderUserId);
       if (liveSenderBalance < transferData.amount) {
         return {
@@ -73,7 +65,7 @@ export class TransferService {
         };
       }
 
-      // ✅ Fetch both users (needed for display info in transaction records)
+      // Fetch both users (needed for display info in transaction records)
       const [sender, receiver] = await Promise.all([
         database.getDocument(
           process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
@@ -87,7 +79,7 @@ export class TransferService {
         )
       ]);
 
-      // ✅ Create transfer record (initial status: pending)
+      // Create transfer record (initial status: pending)
       const transfer = await database.createDocument(
         process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
         process.env.NEXT_PUBLIC_APPWRITE_TRANSFERS_COLLECTION_ID!,
@@ -102,7 +94,7 @@ export class TransferService {
         }
       );
 
-      // ✅ Insert 2 transactions (sender and receiver)
+      // Insert 2 transactions (sender and receiver)
       const now = new Date().toISOString();
       const txCategoryId = process.env.NEXT_PUBLIC_APPWRITE_TRANSFER_CATEGORY_ID!;
 
@@ -141,13 +133,13 @@ export class TransferService {
         ),
       ]);
 
-      // ✅ Re-sync both users' balances after new transactions were created
+      // Re-sync both users' balances after new transactions were created
       await Promise.all([
         syncUserBalance(transferData.senderUserId),
         syncUserBalance(transferData.receiverUserId),
       ]);
 
-      // ✅ Mark the transfer completed
+      // Mark the transfer completed
       await database.updateDocument(
         process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
         process.env.NEXT_PUBLIC_APPWRITE_TRANSFERS_COLLECTION_ID!,

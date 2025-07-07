@@ -16,7 +16,6 @@ const DoughnutChart = () => {
 
   const total = balance / 100;
 
-  // Placeholder split logic – adjust if you have real categories
   const savings = total * 0.2;
   const crypto = total * 0.5;
   const cash = total - savings - crypto;

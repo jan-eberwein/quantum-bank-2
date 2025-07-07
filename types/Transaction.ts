@@ -1,18 +1,15 @@
-// types/Transaction.ts
-
 /**
  * Transaction entity as stored in Appwrite database
- * Based on the Appwrite collection attributes shown in the screenshot
  */
 export interface Transaction {
     $id: string;                    // Appwrite document ID
-    userId: string;                 // Required - User who owns the transaction
-    amount: number;                 // Required - Amount in cents (integer)
-    createdAt: string;              // Required - ISO datetime string
-    merchant: string;               // Required - Merchant name
-    description?: string;           // Optional - Transaction description
-    transactionStatusId: string;    // Required - Reference to unified TransactionStatuses
-    transactionCategoryId: string;  // Required - Reference to TransactionCategory
+    userId: string;                 // User who owns the transaction
+    amount: number;                 // Amount in cents (integer)
+    createdAt: string;              // ISO datetime string
+    merchant: string;
+    description?: string;
+    transactionStatusId: string;
+    transactionCategoryId: string;
     $createdAt?: string;           // Appwrite auto-generated creation timestamp
     $updatedAt?: string;           // Appwrite auto-generated update timestamp
 }
@@ -23,7 +20,7 @@ export interface Transaction {
  */
 export interface TransactionStatus {
     $id: string;        // Appwrite document ID
-    name: string;       // Status name (e.g., "Pending", "Completed", "Rejected")
+    name: string;
     $createdAt?: string;
     $updatedAt?: string;
 }
@@ -33,7 +30,7 @@ export interface TransactionStatus {
  */
 export interface TransactionCategory {
     $id: string;        // Appwrite document ID
-    name: string;       // Category name (e.g., "Food", "Transport", etc.)
+    name: string;
     $createdAt?: string;
     $updatedAt?: string;
 }

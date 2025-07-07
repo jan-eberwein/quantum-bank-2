@@ -24,23 +24,17 @@ const Home: React.FC = () => {
 
   const { balance, loading: balanceLoading } = useBalance(user?.$id, refreshKey);
 
-  // 🔁 Called after successful manual transfer to refresh both balance and transactions
   const handleTransferComplete = () => {
     console.log('🔄 Manual transfer completed, refreshing dashboard...');
     setRefreshKey((prev) => prev + 1);
   };
 
-  // 🎯 Listen for copilot transfer completion events
   useEffect(() => {
     const handleCopilotTransferComplete = (event: CustomEvent) => {
       console.log('🤖 Copilot transfer completed, refreshing dashboard...', event.detail);
       setRefreshKey((prev) => prev + 1);
-
-      // Optional: Show a brief success notification
-      // You could add a toast notification here if desired
     };
 
-    // Add event listener for copilot transfers
     window.addEventListener('copilot-transfer-complete', handleCopilotTransferComplete as EventListener);
 
     // Cleanup event listener on unmount

@@ -1,4 +1,3 @@
-// hooks/useBalance.ts
 import { useMemo } from "react";
 import { usePathname } from "next/navigation";
 import useTransactions from "./useTransactions";

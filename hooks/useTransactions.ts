@@ -1,4 +1,3 @@
-// hooks/useTransactions.ts
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { database } from '@/lib/appwrite';

@@ -1,4 +1,3 @@
-// lib/user.ts
 import { account, database } from "@/lib/appwrite";
 import { UserProfile } from "@/types/User";
 import { Query } from "appwrite";

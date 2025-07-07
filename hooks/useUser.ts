@@ -1,4 +1,3 @@
-// hooks/useUser.ts
 import { useEffect, useState, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { getCurrentUserProfile } from "@/lib/user";

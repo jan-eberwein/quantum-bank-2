@@ -1,4 +1,3 @@
-// components/ChartsBox.tsx
 "use client";
 
 import React, { useMemo } from "react";
@@ -21,11 +20,9 @@ interface ChartsBoxProps {
 const ChartsBox: React.FC<ChartsBoxProps> = ({ refreshKey = 0 }) => {
   const { user } = useUser();
 
-  // ✅ Always call hooks unconditionally - fix for hooks order error
   const { transactions, loading: transactionsLoading } = useTransactions(user?.$id, refreshKey);
   const { categories, loading: categoriesLoading } = useTransactionCategories();
 
-  // ✅ Always calculate chart data (memoized) even if user is null
   const pieData = useMemo(() => {
     if (!user || !transactions.length || !categories.length) return [];
 
@@ -39,6 +36,7 @@ const ChartsBox: React.FC<ChartsBoxProps> = ({ refreshKey = 0 }) => {
         totals.set(name, (totals.get(name) || 0) + euros);
       }
     });
+
     return Array.from(totals, ([category, amount]) => ({ category, amount }));
   }, [user, transactions, categories, refreshKey]);
 
@@ -82,7 +80,6 @@ const ChartsBox: React.FC<ChartsBoxProps> = ({ refreshKey = 0 }) => {
     })).sort((a, b) => monthsOrder.indexOf(a.month) - monthsOrder.indexOf(b.month));
   }, [user, transactions, refreshKey]);
 
-  // ✅ Early return AFTER all hooks have been called
   if (!user) {
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">

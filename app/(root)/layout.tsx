@@ -1,4 +1,3 @@
-// app/(root)/layout.tsx
 'use client';
 
 import Sidebar from "@/components/Sidebar";
