@@ -1,4 +1,3 @@
-// pages/transactions.tsx (oder components/TransactionsPage.tsx, je nach Struktur)
 "use client";
 
 import React, { useMemo, useState } from 'react';
