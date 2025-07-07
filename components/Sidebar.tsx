@@ -1,3 +1,4 @@
+// components/Sidebar.tsx
 "use client";
 
 import React from "react";
@@ -29,15 +30,10 @@ const Sidebar = ({ user: userProp }: SidebarProps) => {
   const { user, refreshUser } = useUser(); // Get user from context for actions
   const { users } = useAllUsers();
 
-  // Format amount helper
   const formatAmount = (value: number | undefined | null) => {
     if (typeof value !== 'number' || isNaN(value)) return '0.00';
     return value.toFixed(2);
   };
-
-  // ================================
-  // ALL COPILOT READABLES
-  // ================================
 
   useCopilotReadable({
     description: "The available pages/parts of the application",
@@ -50,7 +46,7 @@ const Sidebar = ({ user: userProp }: SidebarProps) => {
   });
 
   useCopilotReadable({
-    description: "The current date in yyyy-MM-dd format",
+    description: "The current date in évidence-MM-dd format",
     value: format(new Date(), "yyyy-MM-dd"),
   });
 
@@ -73,10 +69,6 @@ const Sidebar = ({ user: userProp }: SidebarProps) => {
           }))
     },
   });
-
-  // ================================
-  // ALL COPILOT ACTIONS
-  // ================================
 
   useCopilotAction({
     name: "sendMoney",
@@ -269,37 +261,8 @@ const Sidebar = ({ user: userProp }: SidebarProps) => {
     },
   });
 
-  useCopilotAction({
-    name: "toggleSetting",
-    description: "Toggle a user setting like dark mode or notifications",
-    parameters: [
-      {
-        name: "setting",
-        type: "string",
-        description: "The setting to toggle (e.g., 'darkMode', 'notifications')",
-        required: true,
-      },
-      {
-        name: "value",
-        type: "boolean",
-        description: "New value (true to enable, false to disable)",
-        required: true,
-      },
-    ],
-    handler: async ({ setting, value }: { setting: string; value: boolean }) => {
-      const event = new CustomEvent("copilot-setting-toggle", {
-        detail: { setting, value },
-      });
-      window.dispatchEvent(event);
-      return `⚙️ Setting ${setting} has been ${value ? 'enabled' : 'disabled'}.`;
-    },
-  });
+  // --- FIX: Removed the broken `toggleSetting` action ---
 
-  // ================================
-  // VOICE COMMAND INTEGRATION
-  // ================================
-
-  // Provide direct action handlers for voice commands
   const voiceActionHandlers = {
     navigateToPage: (page: string) => {
       switch (page.toLowerCase()) {
@@ -342,7 +305,6 @@ const Sidebar = ({ user: userProp }: SidebarProps) => {
   return (
       <section className="sidebar flex flex-col h-full">
         <nav className="flex flex-col gap-4">
-          {/* Logo */}
           <Link href="/" className="mb-12 cursor-pointer flex items-center gap-2">
             <div className="w-full max-w-[400px] mx-auto hidden sm:block lg:hidden">
               <Image
@@ -366,7 +328,6 @@ const Sidebar = ({ user: userProp }: SidebarProps) => {
             </div>
           </Link>
 
-          {/* Navigation Links */}
           {sidebarLinks.map((item) => {
             const isActive =
                 pathname === item.route || pathname.startsWith(`${item.route}/`);
@@ -402,7 +363,6 @@ const Sidebar = ({ user: userProp }: SidebarProps) => {
           })}
         </nav>
 
-        {/* CopilotUI with voice handlers */}
         <CopilotUI voiceActionHandlers={voiceActionHandlers} />
 
         <UserCard />

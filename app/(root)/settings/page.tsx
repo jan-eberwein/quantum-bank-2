@@ -25,7 +25,6 @@ const SettingsPage = () => {
     });
     const [toggling, setToggling] = useState<{ [k: string]: boolean }>({});
 
-    // Initialize profile + settings state
     useEffect(() => {
         if (!loading && user) {
             setUsername(user.userId);
@@ -45,7 +44,6 @@ const SettingsPage = () => {
         }
     }, [loading, user]);
 
-    // Save username + email
     const handleSaveProfile = async () => {
         if (!user) return;
         setSavingProfile(true);
@@ -59,14 +57,13 @@ const SettingsPage = () => {
         }
     };
 
-    // Toggle dark mode
-    const handleDarkModeToggle = async () => {
+    const handleDarkModeToggle = async (newValue?: boolean) => {
         if (!user) return;
-        const newVal = !settings.darkMode;
-        setSettings((s) => ({ ...s, darkMode: newVal }));
+        const finalValue = newValue !== undefined ? newValue : !settings.darkMode;
+        setSettings((s) => ({ ...s, darkMode: finalValue }));
         setToggling((t) => ({ ...t, darkMode: true }));
         try {
-            await updateUserPreferences(user.$id, { darkModeEnabled: newVal });
+            await updateUserPreferences(user.$id, { darkModeEnabled: finalValue });
             await refreshUser(true);
         } catch (err) {
             console.error(err);
@@ -75,25 +72,26 @@ const SettingsPage = () => {
         }
     };
 
-    // Toggle notifications
+    // --- FIX: Improved function to accept an explicit value ---
     const handleNotificationToggle = async (
-        key: keyof typeof settings.notifications
+        key: keyof typeof settings.notifications,
+        newValue?: boolean
     ) => {
         if (!user) return;
-        // prepare new notifications object
+
         let next = { ...settings.notifications };
+        const currentValue = settings.notifications[key];
+        const finalValue = newValue !== undefined ? newValue : !currentValue;
+
         if (key === "all") {
-            const newAll = !next.all;
-            next = { all: newAll, general: newAll, security: newAll, updates: newAll };
+            next = { all: finalValue, general: finalValue, security: finalValue, updates: finalValue };
         } else {
-            next[key] = !next[key];
-            next.all =
-                next.general && next.security && next.updates;
+            next[key] = finalValue;
+            next.all = next.general && next.security && next.updates;
         }
         setSettings((s) => ({ ...s, notifications: next }));
         setToggling((t) => ({ ...t, [key]: true }));
 
-        // map keys to user doc fields
         const fieldMap = {
             general: "generalNotificationsEnabled",
             security: "securityNotificationsEnabled",
@@ -108,10 +106,10 @@ const SettingsPage = () => {
                     updateNotificationsEnabled: next.updates,
                 });
             } else {
-                const fieldName = fieldMap[key];
-                await updateUserPreferences(user.$id, {
-                    [fieldName]: next[key],
-                });
+                const fieldName = fieldMap[key as keyof typeof fieldMap];
+                if (fieldName) {
+                    await updateUserPreferences(user.$id, { [fieldName]: next[key] });
+                }
             }
             await refreshUser(true);
         } catch (err) {
@@ -121,7 +119,6 @@ const SettingsPage = () => {
         }
     };
 
-    // Sync with CopilotKit
     useCopilotReadable({
         description: "User's account and notification settings",
         value: settings,
@@ -131,6 +128,7 @@ const SettingsPage = () => {
         value: { username, email },
     });
 
+    // --- FIX: Action now correctly passes the value to the handler ---
     useCopilotAction({
         name: "updateSettings",
         description: "Update user account or notification settings",
@@ -138,23 +136,23 @@ const SettingsPage = () => {
             {
                 name: "setting",
                 type: "string",
-                description:
-                    "The setting key to update (darkMode, all/general/security/updates notifications)",
+                description: "The setting key to update (e.g., 'darkMode', 'all', 'security').",
                 required: true,
             },
             {
                 name: "value",
                 type: "boolean",
-                description: "New value for the setting",
+                description: "New value for the setting (true for on, false for off).",
                 required: true,
             },
         ],
         handler: async ({ setting, value }: { setting: string; value: boolean }) => {
             if (setting === "darkMode") {
-                await handleDarkModeToggle();
+                await handleDarkModeToggle(value);
             } else if (["all", "general", "security", "updates"].includes(setting)) {
                 await handleNotificationToggle(
-                    setting as keyof typeof settings.notifications
+                    setting as keyof typeof settings.notifications,
+                    value
                 );
             } else {
                 console.warn("Unsupported setting key:", setting);
@@ -170,7 +168,6 @@ const SettingsPage = () => {
         <div className="settings-page space-y-8 p-8 bg-gray-25">
             <HeaderBox title="Settings" subtext="Manage your account and preferences" />
 
-            {/* Profile Picture */}
             <section>
                 <h3 className="text-2xl font-semibold mb-2">Profile Picture</h3>
                 <ProfileImageUploader />
@@ -178,7 +175,6 @@ const SettingsPage = () => {
 
             <hr className="border-gray-300" />
 
-            {/* Username & Email */}
             <section className="space-y-4">
                 <h3 className="text-2xl font-semibold">Account Information</h3>
                 <div className="max-w-md space-y-4">
@@ -209,35 +205,11 @@ const SettingsPage = () => {
                 </div>
             </section>
 
-            {/*<hr className="border-gray-300" />*/}
-
-            {/* Account Settings */}
-            {/*<section className="space-y-4">
-                <h3 className="text-2xl font-semibold">Account Settings</h3>
-                <div className="border p-4 rounded-md flex justify-between items-center">
-                    <div>
-                        <h4 className="text-lg font-medium">Dark Mode</h4>
-                        <p className="text-sm text-gray-600">Toggle light/dark theme</p>
-                    </div>
-                    <button
-                        onClick={handleDarkModeToggle}
-                        disabled={toggling.darkMode}
-                        className={`px-4 py-2 rounded-md text-white ${
-                            settings.darkMode ? "bg-gray-800" : "bg-blue-500"
-                        }`}
-                    >
-                        {settings.darkMode ? "Enabled" : "Disabled"}
-                    </button>
-                </div>
-            </section>*/}
-
             <hr className="border-gray-300" />
 
-            {/* Notifications */}
             <section className="space-y-4">
                 <h3 className="text-2xl font-semibold">Notifications</h3>
 
-                {/* Enable All */}
                 <div className="border p-4 rounded-md flex justify-between items-center">
                     <div>
                         <h4 className="text-lg font-medium">Enable All Notifications</h4>
@@ -254,7 +226,6 @@ const SettingsPage = () => {
                     </button>
                 </div>
 
-                {/* Individual */}
                 {(["general", "security", "updates"] as const).map((cat) => (
                     <div
                         key={cat}
@@ -287,7 +258,6 @@ const SettingsPage = () => {
 
             <hr className="border-gray-300" />
 
-            {/* Current Status Display */}
             <section>
                 <h3 className="text-lg font-semibold mb-2">
                     Current Notification Status
